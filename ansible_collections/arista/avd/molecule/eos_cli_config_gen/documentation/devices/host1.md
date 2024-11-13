@@ -58,6 +58,7 @@
   - [Event Handler](#event-handler)
   - [Object Tracking](#object-tracking)
   - [Monitor Telemetry Postcard Policy](#monitor-telemetry-postcard-policy)
+  - [Monitor Server Radius Summary](#monitor-server-radius-summary)
 - [Monitor Connectivity](#monitor-connectivity)
   - [Global Configuration](#global-configuration)
   - [VRF Configuration](#vrf-configuration)
@@ -1719,6 +1720,29 @@ monitor telemetry postcard policy
    !
    profile profile2
       ingress sample policy samplepo2
+```
+
+### Monitor Server Radius Summary
+
+Monitor servers are used for 802.1x authentication.
+
+#### Server Probe Settings
+
+| Setting | Value |
+| ------- | ----- |
+| Probe interval | 100 |
+| Threshold failure | 100 |
+| Probe method | access-request |
+
+#### Monitor Server Radius Device Configuration
+
+```eos
+!
+monitor server radius
+   service dot1x
+   probe interval 100 seconds
+   probe threshold failure 100
+   probe method access-request username arista password 7 <removed>
 ```
 
 ## Monitor Connectivity
