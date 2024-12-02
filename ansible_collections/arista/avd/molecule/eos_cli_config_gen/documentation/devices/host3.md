@@ -6,6 +6,7 @@
   - [Management Interfaces](#management-interfaces)
 - [Routing](#routing)
   - [Router BGP](#router-bgp)
+  - [Traffic Policies information](#traffic-policies-information)
 
 ## Management
 
@@ -87,4 +88,13 @@ router bgp 65101.0001
    address-family ipv6
       redistribute ospfv3 include leaked route-map RM-REDISTRIBUTE-OSPFV3
       redistribute ospfv3 match external include leaked route-map RM-REDISTRIBUTE-OSPFV3-EXTERNAL
+```
+
+### Traffic Policies information
+
+#### Traffic Policies Device Configuration
+
+```eos
+!
+traffic-policies
 ```
