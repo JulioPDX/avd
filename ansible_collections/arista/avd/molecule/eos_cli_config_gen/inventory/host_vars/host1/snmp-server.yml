@@ -1,4 +1,4 @@
-### Snmp Settings ####
+---
 snmp_server:
   engine_ids:
     local: 424242424242424242
@@ -113,7 +113,7 @@ snmp_server:
       remote_address: 42.42.42.42
       localized: DEADBEEFCAFE123456
       auth: sha
-      auth_passphrase: ShouldBeEncryptedPassword
+      auth_passphrase: DEADBEEFCAFE123456ABC1234321AB1233456778
   hosts:
     - host: 10.6.75.121
       vrf: MGMT
@@ -143,6 +143,19 @@ snmp_server:
           authentication_level: priv
   traps:
     enable: true
+    snmp_traps:
+      - name: bridge
+      - name: bridge arista-mac-age
+        enabled: false
+      - name: mpls
+      - name: bgp
+      - name: bgp arista-backward-transition
+        enabled: false
+      - name: lldp
+      - name: msdp backward-transition
+      - name: msdp established
+      - name: snmp link-down
+      - name: snmpConfigManEvent
   vrfs:
     - name: default
       enable: false

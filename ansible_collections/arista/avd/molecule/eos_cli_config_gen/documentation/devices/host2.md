@@ -29,6 +29,7 @@
 - [Monitoring](#monitoring)
   - [TerminAttr Daemon](#terminattr-daemon)
   - [Logging](#logging)
+  - [SNMP](#snmp)
   - [Flow Tracking](#flow-tracking)
   - [Monitor Server Radius Summary](#monitor-server-radius-summary)
 - [Monitor Connectivity](#monitor-connectivity)
@@ -37,6 +38,9 @@
 - [LACP](#lacp)
   - [LACP Summary](#lacp-summary)
   - [LACP Device Configuration](#lacp-device-configuration)
+- [Spanning Tree](#spanning-tree)
+  - [Spanning Tree Summary](#spanning-tree-summary)
+  - [Spanning Tree Device Configuration](#spanning-tree-device-configuration)
 - [Interfaces](#interfaces)
   - [Switchport Default](#switchport-default)
   - [DPS Interfaces](#dps-interfaces)
@@ -46,6 +50,7 @@
   - [IP Routing](#ip-routing)
   - [ARP](#arp)
   - [Router Adaptive Virtual Topology](#router-adaptive-virtual-topology)
+  - [Router ISIS](#router-isis)
   - [Router BGP](#router-bgp)
   - [PBR Policy Maps](#pbr-policy-maps)
 - [BFD](#bfd)
@@ -411,6 +416,21 @@ logging facility syslog
 logging event link-status global
 ```
 
+### SNMP
+
+#### SNMP Configuration Summary
+
+| Contact | Location | SNMP Traps | State |
+| ------- | -------- | ---------- | ----- |
+| - | - | All | Disabled |
+
+#### SNMP Device Configuration
+
+```eos
+!
+no snmp-server enable traps
+```
+
 ### Flow Tracking
 
 #### Flow Tracking Sampled
@@ -499,6 +519,29 @@ monitor connectivity
 ```eos
 !
 lacp system-priority 0
+```
+
+## Spanning Tree
+
+### Spanning Tree Summary
+
+STP mode: **rstp**
+
+#### Global Spanning-Tree Settings
+
+- Global RSTP priority: 8192
+- Global BPDU Guard for Edge ports is enabled.
+- Global BPDU Filter for Edge ports is enabled.
+
+### Spanning Tree Device Configuration
+
+```eos
+!
+spanning-tree mode rstp
+spanning-tree edge-port bpduguard default
+spanning-tree edge-port bpdufilter default
+no spanning-tree bpduguard rate-limit default
+spanning-tree priority 8192
 ```
 
 ## Interfaces
@@ -609,6 +652,78 @@ VXLAN gateway: Enabled
 !
 router adaptive-virtual-topology
    topology role edge gateway vxlan
+```
+
+### Router ISIS
+
+#### Router ISIS Summary
+
+| Settings | Value |
+| -------- | ----- |
+| Instance | EVPN_UNDERLAY |
+| Net-ID | 49.0001.0001.0001.0001.00 |
+| Type | level-2 |
+| Router-ID | 192.168.255.3 |
+| Log Adjacency Changes | True |
+| SR MPLS Enabled | False |
+| SPF Interval | 250 seconds |
+
+#### ISIS Route Timers
+
+| Settings | Value |
+| -------- | ----- |
+| Local Convergence Delay | 10000 milliseconds |
+
+#### ISIS Interfaces Summary
+
+| Interface | ISIS Instance | ISIS Metric | Interface Mode |
+| --------- | ------------- | ----------- | -------------- |
+
+#### ISIS IPv4 Address Family Summary
+
+| Settings | Value |
+| -------- | ----- |
+| IPv4 Address-family Enabled | True |
+
+#### Tunnel Source
+
+| Source Protocol | RCF |
+| --------------- | --- |
+| BGP Labeled-Unicast | - |
+
+#### ISIS IPv6 Address Family Summary
+
+| Settings | Value |
+| -------- | ----- |
+| IPv6 Address-family Enabled | True |
+| BFD All-interfaces | True |
+| TI-LFA SRLG Enabled | True |
+
+#### Router ISIS Device Configuration
+
+```eos
+!
+router isis EVPN_UNDERLAY
+   net 49.0001.0001.0001.0001.00
+   router-id ipv4 192.168.255.3
+   is-type level-2
+   log-adjacency-changes
+   timers local-convergence-delay protected-prefixes
+   set-overload-bit on-startup wait-for-bgp
+   spf-interval 250
+   authentication mode sha key-id 5 rx-disabled level-1
+   authentication mode shared-secret profile test2 algorithm md5 rx-disabled level-2
+   authentication key 0 password
+   !
+   address-family ipv4 unicast
+      tunnel source-protocol bgp ipv4 labeled-unicast
+   !
+   address-family ipv6 unicast
+      bfd all-interfaces
+      fast-reroute ti-lfa srlg
+   !
+   segment-routing mpls
+      shutdown
 ```
 
 ### Router BGP
