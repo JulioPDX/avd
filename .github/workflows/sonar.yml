@@ -1,15 +1,14 @@
 ---
 name: Analysis with Sonarlint and publish to SonarCloud
 "on":
-  push:
-    branches:
-      - devel
-  # Need to do this to be able to have coverage on PR across forks.
-  pull_request_target:
+  workflow_run:
+    workflows: ["Collection code testing"]
+    types: [completed]
 
 jobs:
   sonarcloud:
     name: Run Sonarlint analysis and upload to SonarCloud.
+    needs: [ansible_test_units, ansible_test_integration]
     if: github.repository == 'aristanetworks/avd'
     runs-on: ubuntu-latest
     steps:
@@ -17,15 +16,24 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Download coverage from ansible-test units
+        uses: actions/download-artifact@v4
         with:
-          python-version: 3.11
-      - name: Install dependencies
-        run: pip install tox tox-gh-actions
-      - name: "Run pytest via tox for ${{ matrix.python }}"
-        working-directory: python-avd
-        run: tox -e coverage,xml-report
+          name: ansible-test-units-coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ansible_collections/arista/avd/tests/output/coverage/
+      - name: Download coverage from ansible-test integration
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-test-integration-coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ansible_collections/arista/avd/tests/output/coverage/
+      - name: Download coverage from pytest
+        uses: actions/download-artifact@v4
+        with:
+          name: pytest-coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: python-avd/coverage.xml
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
