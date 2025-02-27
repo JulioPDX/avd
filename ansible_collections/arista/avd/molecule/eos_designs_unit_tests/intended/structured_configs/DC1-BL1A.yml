@@ -254,7 +254,8 @@ mac_address_table:
   notification_host_flap:
     logging: true
 management_api_http:
-  enable_https: true
+  enable_http: false
+  enable_https: false
   default_services: false
   enable_vrfs:
   - name: MGMT

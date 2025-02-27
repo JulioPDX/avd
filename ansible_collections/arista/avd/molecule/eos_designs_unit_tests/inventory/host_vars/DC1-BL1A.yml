@@ -82,3 +82,10 @@ override_mac_address_table: "{{ my_mac_address_table }}"
 # eos_designs_unit_tests should not have any CloudVision tags generated for them
 generate_cv_tags:
   topology_hints: true
+
+# Management api-http
+# Expicitely disabling http and https
+management_eapi:
+  enable_https: false
+  enable_http: false
+  default_services: false
