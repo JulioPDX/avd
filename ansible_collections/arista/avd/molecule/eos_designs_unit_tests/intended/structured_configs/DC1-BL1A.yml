@@ -1,7 +1,5 @@
 aaa_root:
   disabled: true
-clock:
-  timezone: correctly_templated_timezone
 config_end: true
 daemon_terminattr:
   cvaddrs:
@@ -251,8 +249,6 @@ loopback_interfaces:
   - 192.168.255.255/32
 mac_address_table:
   aging_time: 42
-  notification_host_flap:
-    logging: true
 management_api_http:
   enable_http: false
   enable_https: false

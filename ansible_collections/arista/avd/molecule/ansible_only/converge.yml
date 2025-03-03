@@ -1,8 +1,10 @@
 ---
 - name: Converge
-  hosts: EOS_DESIGNS_UNIT_TESTS
+  hosts: ANSIBLE_ONLY
   gather_facts: false
   connection: local
+  vars:
+    string_set_as_play_var: "test of var set under play vars"
   tasks:
     - name: Generate intended variables
       delegate_to: 127.0.0.1
