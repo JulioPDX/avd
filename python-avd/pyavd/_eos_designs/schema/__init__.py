@@ -15366,7 +15366,7 @@ class EosDesigns(EosDesignsRootModel):
                 "application_profile": {"type": str, "default": "APP-PROFILE-CONTROL-PLANE"},
                 "traffic_class": {"type": int},
                 "dscp": {"type": int},
-                "lowest_hop_count": {"type": bool, "default": False},
+                "lowest_hop_count": {"type": bool},
                 "constraints": {"type": Constraints},
                 "path_groups": {"type": PathGroups},
                 "internet_exit": {"type": InternetExit},
@@ -15392,12 +15392,10 @@ class EosDesigns(EosDesignsRootModel):
             """Set traffic-class for matched traffic."""
             dscp: int | None
             """Set DSCP for matched traffic."""
-            lowest_hop_count: bool
+            lowest_hop_count: bool | None
             """
             Prefer paths with lowest hop-count.
             Only applicable for `wan_mode: "cv-pathfinder"`.
-
-            Default value: `False`
             """
             constraints: Constraints
             """Subclass of AvdModel."""
@@ -15415,7 +15413,7 @@ class EosDesigns(EosDesignsRootModel):
                     application_profile: str | UndefinedType = Undefined,
                     traffic_class: int | None | UndefinedType = Undefined,
                     dscp: int | None | UndefinedType = Undefined,
-                    lowest_hop_count: bool | UndefinedType = Undefined,
+                    lowest_hop_count: bool | None | UndefinedType = Undefined,
                     constraints: Constraints | UndefinedType = Undefined,
                     path_groups: PathGroups | UndefinedType = Undefined,
                     internet_exit: InternetExit | UndefinedType = Undefined,
@@ -15588,7 +15586,7 @@ class EosDesigns(EosDesignsRootModel):
                     "id": {"type": int},
                     "traffic_class": {"type": int},
                     "dscp": {"type": int},
-                    "lowest_hop_count": {"type": bool, "default": False},
+                    "lowest_hop_count": {"type": bool},
                     "constraints": {"type": Constraints},
                     "path_groups": {"type": PathGroups},
                     "internet_exit": {"type": InternetExit},
@@ -15612,12 +15610,10 @@ class EosDesigns(EosDesignsRootModel):
                 """Set traffic-class for matched traffic."""
                 dscp: int | None
                 """Set DSCP for matched traffic."""
-                lowest_hop_count: bool
+                lowest_hop_count: bool | None
                 """
                 Prefer paths with lowest hop-count.
                 Only applicable for `wan_mode: "cv-pathfinder"`.
-
-                Default value: `False`
                 """
                 constraints: Constraints
                 """Subclass of AvdModel."""
@@ -15636,7 +15632,7 @@ class EosDesigns(EosDesignsRootModel):
                         id: int | None | UndefinedType = Undefined,
                         traffic_class: int | None | UndefinedType = Undefined,
                         dscp: int | None | UndefinedType = Undefined,
-                        lowest_hop_count: bool | UndefinedType = Undefined,
+                        lowest_hop_count: bool | None | UndefinedType = Undefined,
                         constraints: Constraints | UndefinedType = Undefined,
                         path_groups: PathGroups | UndefinedType = Undefined,
                         internet_exit: InternetExit | UndefinedType = Undefined,
@@ -15813,7 +15809,7 @@ class EosDesigns(EosDesignsRootModel):
                     "drop_unmatched": {"type": bool, "default": False},
                     "traffic_class": {"type": int},
                     "dscp": {"type": int},
-                    "lowest_hop_count": {"type": bool, "default": False},
+                    "lowest_hop_count": {"type": bool},
                     "constraints": {"type": Constraints},
                     "path_groups": {"type": PathGroups},
                     "internet_exit": {"type": InternetExit},
@@ -15830,12 +15826,10 @@ class EosDesigns(EosDesignsRootModel):
                 """Set traffic-class for matched traffic."""
                 dscp: int | None
                 """Set DSCP for matched traffic."""
-                lowest_hop_count: bool
+                lowest_hop_count: bool | None
                 """
                 Prefer paths with lowest hop-count.
                 Only applicable for `wan_mode: "cv-pathfinder"`.
-
-                Default value: `False`
                 """
                 constraints: Constraints
                 """Subclass of AvdModel."""
@@ -15853,7 +15847,7 @@ class EosDesigns(EosDesignsRootModel):
                         drop_unmatched: bool | UndefinedType = Undefined,
                         traffic_class: int | None | UndefinedType = Undefined,
                         dscp: int | None | UndefinedType = Undefined,
-                        lowest_hop_count: bool | UndefinedType = Undefined,
+                        lowest_hop_count: bool | None | UndefinedType = Undefined,
                         constraints: Constraints | UndefinedType = Undefined,
                         path_groups: PathGroups | UndefinedType = Undefined,
                         internet_exit: InternetExit | UndefinedType = Undefined,

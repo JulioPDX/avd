@@ -531,7 +531,7 @@ class WanMixin(Protocol):
         raise AristaAvdError(msg)
 
     @cached_property
-    def wan_ha_interfaces(self: SharedUtilsProtocol) -> list:
+    def wan_ha_interfaces(self: SharedUtilsProtocol) -> list[str]:
         """
         Return the list of interfaces for WAN HA.
 

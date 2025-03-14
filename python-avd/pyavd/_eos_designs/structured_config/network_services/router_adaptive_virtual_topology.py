@@ -106,7 +106,7 @@ class RouterAdaptiveVirtualTopologyMixin(Protocol):
             for match in policy.get("matches", []):
                 profile = {
                     "name": match["avt_profile"],
-                    "load_balance_policy": match["load_balance_policy"]["name"],
+                    "load_balance_policy": match["load_balance_policy"].name,
                 }
                 if (internet_exit_policy_name := match["internet_exit_policy_name"]) is not None and internet_exit_policy_name in [
                     policy.name for policy, _connections in self._filtered_internet_exit_policies_and_connections
@@ -123,7 +123,7 @@ class RouterAdaptiveVirtualTopologyMixin(Protocol):
             if (default_match := policy.get("default_match")) is not None:
                 profile = {
                     "name": default_match["avt_profile"],
-                    "load_balance_policy": default_match["load_balance_policy"]["name"],
+                    "load_balance_policy": default_match["load_balance_policy"].name,
                 }
                 if (internet_exit_policy_name := default_match["internet_exit_policy_name"]) is not None and internet_exit_policy_name in [
                     policy.name for policy, _connections in self._filtered_internet_exit_policies_and_connections
