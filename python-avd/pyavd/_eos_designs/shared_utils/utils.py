@@ -3,7 +3,6 @@
 # that can be found in the LICENSE file.
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import TYPE_CHECKING, Protocol
 
 from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError
@@ -29,6 +28,9 @@ class UtilsMixin(Protocol):
     Class should only be used as Mixin to the SharedUtils class.
     Using type-hint on self to get proper type-hints on attributes across all Mixins.
     """
+
+    resolved_port_profiles_cache: dict[str, EosDesigns.PortProfilesItem] | None = None
+    """Poor-mans cache to only resolve and deepmerge a port_profile once."""
 
     def get_peer_facts(self: SharedUtilsProtocol, peer_name: str, required: bool = True) -> EosDesignsFacts | dict | None:
         """
@@ -58,9 +60,26 @@ class UtilsMixin(Protocol):
             msg = f"Error during templating of template: {template_file}"
             raise AristaAvdError(msg) from e
 
-    @lru_cache  # noqa: B019
     def get_merged_port_profile(self: SharedUtilsProtocol, profile_name: str, context: str) -> EosDesigns.PortProfilesItem:
-        """Return list of merged "port_profiles" where "parent_profile" has been applied."""
+        """
+        Return list of merged "port_profiles" where "parent_profile" has been applied.
+
+        Leverages a dict of resolved profiles as a cache.
+        """
+        if self.resolved_port_profiles_cache and profile_name in self.resolved_port_profiles_cache:
+            return self.resolved_port_profiles_cache[profile_name]
+
+        resolved_profile = self.resolve_port_profile(profile_name, context)
+
+        # Update the cache so we don't resolve again next time.
+        if self.resolved_port_profiles_cache is None:
+            self.resolved_port_profiles_cache = {}
+        self.resolved_port_profiles_cache[profile_name] = resolved_profile
+
+        return resolved_profile
+
+    def resolve_port_profile(self: SharedUtilsProtocol, profile_name: str, context: str) -> EosDesigns.PortProfilesItem:
+        """Resolve one port-profile and return it. Also updates the cache."""
         if profile_name not in self.inputs.port_profiles:
             msg = f"Profile '{profile_name}' applied under '{context}' does not exist in `port_profiles`."
             raise AristaAvdInvalidInputsError(msg)
@@ -77,6 +96,7 @@ class UtilsMixin(Protocol):
             port_profile = port_profile._deepinherited(parent_profile)
 
         delattr(port_profile, "parent_profile")
+
         return port_profile
 
     def get_merged_adapter_settings(self: SharedUtilsProtocol, adapter_or_network_port_settings: ADAPTER_SETTINGS) -> ADAPTER_SETTINGS:
