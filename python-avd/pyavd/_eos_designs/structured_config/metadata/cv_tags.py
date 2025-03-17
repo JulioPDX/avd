@@ -103,7 +103,7 @@ class CvTagsMixin(Protocol):
             ("Role", self.shared_utils.cv_pathfinder_role),
             ("Region", region_name),
             ("PathfinderSet", self.shared_utils.group or "PATHFINDERS" if self.shared_utils.is_cv_pathfinder_server else None),
-            ("Zone", self.shared_utils.wan_zone["name"] if not self.shared_utils.is_cv_pathfinder_server else None),
+            ("Zone", self.shared_utils.wan_zone.name if not self.shared_utils.is_cv_pathfinder_server else None),
             ("Site", site_name if not self.shared_utils.is_cv_pathfinder_server else None),
         ]:
             tag = self._tag_dict(name, value)

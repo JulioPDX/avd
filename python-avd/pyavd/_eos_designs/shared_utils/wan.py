@@ -7,6 +7,7 @@ from functools import cached_property
 from re import findall
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.schema import EosDesigns
 from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError, AristaAvdMissingVariableError
 from pyavd._utils import default, get, get_ip_from_ip_prefix, strip_empties_from_dict
@@ -307,7 +308,7 @@ class WanMixin(Protocol):
         return self.inputs.cv_pathfinder_regions[node_defined_region]
 
     @property
-    def wan_zone(self: SharedUtilsProtocol) -> dict:
+    def wan_zone(self: SharedUtilsProtocol) -> EosCliConfigGen.RouterAdaptiveVirtualTopology.Zone:
         """
         WAN zone for Pathfinder.
 
@@ -319,7 +320,7 @@ class WanMixin(Protocol):
             msg = "Could not find 'cv_pathfinder_region' so it is not possible to auto-generate the zone."
             raise AristaAvdInvalidInputsError(msg)
 
-        return {"name": f"{self.wan_region.name}-ZONE", "id": 1}
+        return EosCliConfigGen.RouterAdaptiveVirtualTopology.Zone(name=f"{self.wan_region.name}-ZONE", id=1)
 
     @cached_property
     def filtered_wan_route_servers(self: SharedUtilsProtocol) -> EosDesigns.WanRouteServers:
