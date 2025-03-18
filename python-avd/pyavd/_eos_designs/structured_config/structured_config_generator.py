@@ -50,7 +50,7 @@ class StructCfgs:
             msg = f"Unsupported list merge strategy: {ansible_strategy}"
             raise ValueError(msg)
 
-        list_merge_strategy = cast(Literal["append_unique", "append", "replace", "keep", "prepend", "prepend_unique"], list_merge_strategy)
+        list_merge_strategy = cast("Literal['append_unique', 'append', 'replace', 'keep', 'prepend', 'prepend_unique']", list_merge_strategy)
         return cls(list_merge_strategy=list_merge_strategy)
 
 

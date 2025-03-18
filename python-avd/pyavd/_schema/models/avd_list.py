@@ -118,7 +118,7 @@ class AvdList(Sequence[T_ItemType], Generic[T_ItemType], AvdBase):
     def _strip_empties(self) -> None:
         """In-place update the instance to remove data matching the given strip_values."""
         if issubclass(self._item_type, AvdBase):
-            items = cast(list[AvdBase], self._items)
+            items = cast("list[AvdBase]", self._items)
             [item._strip_empties() for item in items]
             self._items = [item for item in self._items if item]
             return
@@ -128,7 +128,7 @@ class AvdList(Sequence[T_ItemType], Generic[T_ItemType], AvdBase):
     def _as_list(self, include_default_values: bool = False) -> list:
         """Returns a list with all the data from this model and any nested models."""
         if issubclass(self._item_type, AvdBase):
-            items = cast(list[AvdBase], self._items)
+            items = cast("list[AvdBase]", self._items)
             return [item._dump(include_default_values=include_default_values) for item in items]
 
         return list(self._items)
@@ -223,7 +223,7 @@ class AvdList(Sequence[T_ItemType], Generic[T_ItemType], AvdBase):
             raise TypeError(msg)
 
         if issubclass(self._item_type, AvdBase):
-            items = cast(list[AvdBase], self._items)
+            items = cast("list[AvdBase]", self._items)
             return new_type([item._cast_as(new_type._item_type, ignore_extra_keys=ignore_extra_keys) for item in items])
 
         if self._item_type != new_type._item_type:
@@ -247,6 +247,6 @@ class AvdList(Sequence[T_ItemType], Generic[T_ItemType], AvdBase):
         if self._created_from_null != other._created_from_null:
             return False
 
-        items = cast(list[AvdBase], self._items)
-        other_items = cast(list[AvdBase], other._items)
+        items = cast("list[AvdBase]", self._items)
+        other_items = cast("list[AvdBase]", other._items)
         return all(item == other_items[index] for index, item in enumerate(items))
