@@ -58301,11 +58301,13 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         class Phone(AvdModel):
             """Subclass of AvdModel."""
 
-            _fields: ClassVar[dict] = {"cos": {"type": int}, "trunk": {"type": str}, "vlan": {"type": int}}
+            _fields: ClassVar[dict] = {"cos": {"type": int}, "trunk": {"type": str}, "vlan": {"type": int}, "access_list_bypass": {"type": bool}}
             cos: int | None
             trunk: Literal["tagged", "untagged"] | None
             vlan: int | None
             """VLAN ID."""
+            access_list_bypass: bool | None
+            """Bypass phone traffic from configured access-list."""
 
             if TYPE_CHECKING:
 
@@ -58315,6 +58317,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     cos: int | None | UndefinedType = Undefined,
                     trunk: Literal["tagged", "untagged"] | None | UndefinedType = Undefined,
                     vlan: int | None | UndefinedType = Undefined,
+                    access_list_bypass: bool | None | UndefinedType = Undefined,
                 ) -> None:
                     """
                     Phone.
@@ -58326,6 +58329,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                         cos: cos
                         trunk: trunk
                         vlan: VLAN ID.
+                        access_list_bypass: Bypass phone traffic from configured access-list.
 
                     """
 

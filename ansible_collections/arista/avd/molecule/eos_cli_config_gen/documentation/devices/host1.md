@@ -3543,6 +3543,7 @@ ip security
 #### Switchport Defaults Summary
 
 - Default Switchport Mode: access
+- Default Switchport Phone Access-list Bypass: True
 - Default Switchport Phone COS: 0
 - Default Switchport Phone Trunk: tagged
 - Default Switchport Phone VLAN: 69
@@ -3552,6 +3553,8 @@ ip security
 ```eos
 !
 switchport default mode access
+!
+switchport default phone access-list bypass
 !
 switchport default phone cos 0
 !

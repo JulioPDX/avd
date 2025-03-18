@@ -21828,6 +21828,9 @@ keys:
             - str
             min: 1
             max: 4094
+          access_list_bypass:
+            description: Bypass phone traffic from configured access-list.
+            type: bool
   switchport_port_security:
     type: dict
     keys:
