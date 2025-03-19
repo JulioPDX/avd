@@ -31525,11 +31525,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                             "max_probability": {"type": int},
                             "weight": {"type": int},
                         }
-                        units: Literal["segments", "bytes", "kbytes", "mbytes", "milliseconds"]
-                        """
-                        Units to be used for the threshold values.
-                        This should be one of segments, byte, kbytes, mbytes.
-                        """
+                        units: Literal["segments", "bytes", "kbytes", "mbytes", "milliseconds", "microseconds"]
+                        """Units to be used for the threshold values."""
                         min: int
                         """Random-detect ECN minimum-threshold."""
                         max: int
@@ -31544,7 +31541,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                             def __init__(
                                 self,
                                 *,
-                                units: Literal["segments", "bytes", "kbytes", "mbytes", "milliseconds"] | UndefinedType = Undefined,
+                                units: Literal["segments", "bytes", "kbytes", "mbytes", "milliseconds", "microseconds"] | UndefinedType = Undefined,
                                 min: int | UndefinedType = Undefined,
                                 max: int | UndefinedType = Undefined,
                                 max_probability: int | None | UndefinedType = Undefined,
@@ -31557,9 +31554,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                                 Subclass of AvdModel.
 
                                 Args:
-                                    units:
-                                       Units to be used for the threshold values.
-                                       This should be one of segments, byte, kbytes, mbytes.
+                                    units: Units to be used for the threshold values.
                                     min: Random-detect ECN minimum-threshold.
                                     max: Random-detect ECN maximum-threshold.
                                     max_probability: Random-detect ECN maximum mark probability.
