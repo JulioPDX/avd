@@ -364,3 +364,19 @@ class MiscMixin(Protocol):
         l3_bgp_neighbors = self.get_l3_generic_interface_bgp_neighbors(self.l3_interfaces)
         l3_bgp_neighbors.extend(self.get_l3_generic_interface_bgp_neighbors(self.node_config.l3_port_channels))
         return l3_bgp_neighbors
+
+    @cached_property
+    def is_sfe_interface_profile_supported(self: SharedUtilsProtocol) -> bool:
+        """Returns bool indicating whether platform SFE interface profile is supported."""
+        return self.platform_settings.feature_support.platform_sfe_interface_profile.supported
+
+    @cached_property
+    def max_rx_queues(self: SharedUtilsProtocol) -> int:
+        """
+        Returns maximum value allowed for rx_queue count configured under L3 interface or L3 Port-Channel interface.
+
+        This is used for building SFE interface profile.
+        """
+        if not self.is_sfe_interface_profile_supported:
+            return 0
+        return self.platform_settings.feature_support.platform_sfe_interface_profile.max_rx_queues

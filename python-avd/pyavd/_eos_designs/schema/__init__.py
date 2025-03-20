@@ -6034,6 +6034,53 @@ class EosDesigns(EosDesignsRootModel):
 
                     """
 
+        class RxQueue(AvdModel):
+            """Subclass of AvdModel."""
+
+            class Workers(AvdList[str]):
+                """Subclass of AvdList with `str` items."""
+
+            Workers._item_type = str
+
+            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+            count: int | None
+            """
+            Number of receive queues.
+            The maximum value is determined by
+            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+            `platform` set on this device.
+            """
+            workers: Workers
+            """Subclass of AvdList with `str` items."""
+            mode: Literal["shared", "exclusive"] | None
+            """Mode applicable to the workers."""
+
+            if TYPE_CHECKING:
+
+                def __init__(
+                    self,
+                    *,
+                    count: int | None | UndefinedType = Undefined,
+                    workers: Workers | UndefinedType = Undefined,
+                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                ) -> None:
+                    """
+                    RxQueue.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        count:
+                           Number of receive queues.
+                           The maximum value is determined by
+                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                           `platform` set on this device.
+                        workers: Subclass of AvdList with `str` items.
+                        mode: Mode applicable to the workers.
+
+                    """
+
         class FlowTracking(AvdModel):
             """Subclass of AvdModel."""
 
@@ -6082,6 +6129,7 @@ class EosDesigns(EosDesignsRootModel):
             "wan_circuit_id": {"type": str},
             "connected_to_pathfinder": {"type": bool, "default": True},
             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+            "rx_queue": {"type": RxQueue},
             "raw_eos_cli": {"type": str},
             "flow_tracking": {"type": FlowTracking},
             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -6230,6 +6278,15 @@ class EosDesigns(EosDesignsRootModel):
 
         Subclass of AvdModel.
         """
+        rx_queue: RxQueue
+        """
+        Receive queue parameters for platform SFE interface profile.
+        This setting is ignored unless the
+        `platform_sfe_interface_profile.supported` is set as `true` under
+        `platform_settings.feature_support` for the `platform` set on this device.
+
+        Subclass of AvdModel.
+        """
         raw_eos_cli: str | None
         """EOS CLI rendered directly on the interface in the final EOS configuration."""
         flow_tracking: FlowTracking
@@ -6269,6 +6326,7 @@ class EosDesigns(EosDesignsRootModel):
                 wan_circuit_id: str | None | UndefinedType = Undefined,
                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                rx_queue: RxQueue | UndefinedType = Undefined,
                 raw_eos_cli: str | None | UndefinedType = Undefined,
                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -6369,6 +6427,13 @@ class EosDesigns(EosDesignsRootModel):
                     connected_to_pathfinder: For a WAN interface (`wan_carrier` is set), allow to disable the static tunnel towards Pathfinders.
                     cv_pathfinder_internet_exit:
                        PREVIEW: This key is in preview mode
+
+                       Subclass of AvdModel.
+                    rx_queue:
+                       Receive queue parameters for platform SFE interface profile.
+                       This setting is ignored unless the
+                       `platform_sfe_interface_profile.supported` is set as `true` under
+                       `platform_settings.feature_support` for the `platform` set on this device.
 
                        Subclass of AvdModel.
                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
@@ -9494,6 +9559,38 @@ class EosDesigns(EosDesignsRootModel):
         class FeatureSupport(AvdModel):
             """Subclass of AvdModel."""
 
+            class PlatformSfeInterfaceProfile(AvdModel):
+                """Subclass of AvdModel."""
+
+                _fields: ClassVar[dict] = {"supported": {"type": bool, "default": False}, "max_rx_queues": {"type": int, "default": 6}}
+                supported: bool
+                """
+                Capability flag for generation of SFE interface profile.
+
+                Default value: `False`
+                """
+                max_rx_queues: int
+                """
+                Maximum rx_queue count supported on any interface.
+
+                Default value: `6`
+                """
+
+                if TYPE_CHECKING:
+
+                    def __init__(self, *, supported: bool | UndefinedType = Undefined, max_rx_queues: int | UndefinedType = Undefined) -> None:
+                        """
+                        PlatformSfeInterfaceProfile.
+
+
+                        Subclass of AvdModel.
+
+                        Args:
+                            supported: Capability flag for generation of SFE interface profile.
+                            max_rx_queues: Maximum rx_queue count supported on any interface.
+
+                        """
+
             _fields: ClassVar[dict] = {
                 "queue_monitor_length_notify": {"type": bool, "default": True},
                 "interface_storm_control": {"type": bool, "default": True},
@@ -9501,6 +9598,7 @@ class EosDesigns(EosDesignsRootModel):
                 "per_interface_mtu": {"type": bool, "default": True},
                 "bgp_update_wait_install": {"type": bool, "default": True},
                 "bgp_update_wait_for_convergence": {"type": bool, "default": True},
+                "platform_sfe_interface_profile": {"type": PlatformSfeInterfaceProfile},
             }
             queue_monitor_length_notify: bool
             """Default value: `True`"""
@@ -9537,6 +9635,12 @@ class EosDesigns(EosDesignsRootModel):
 
             Default value: `True`
             """
+            platform_sfe_interface_profile: PlatformSfeInterfaceProfile
+            """
+            Support for Platform SFE Interface Profiles.
+
+            Subclass of AvdModel.
+            """
 
             if TYPE_CHECKING:
 
@@ -9549,6 +9653,7 @@ class EosDesigns(EosDesignsRootModel):
                     per_interface_mtu: bool | UndefinedType = Undefined,
                     bgp_update_wait_install: bool | UndefinedType = Undefined,
                     bgp_update_wait_for_convergence: bool | UndefinedType = Undefined,
+                    platform_sfe_interface_profile: PlatformSfeInterfaceProfile | UndefinedType = Undefined,
                 ) -> None:
                     """
                     FeatureSupport.
@@ -9577,6 +9682,10 @@ class EosDesigns(EosDesignsRootModel):
                            that may not yet be installed into the forwarding plane.
                            Can be overridden by setting
                            "bgp_update_wait_for_convergence" host/group_vars.
+                        platform_sfe_interface_profile:
+                           Support for Platform SFE Interface Profiles.
+
+                           Subclass of AvdModel.
 
                     """
 
@@ -9758,6 +9867,38 @@ class EosDesigns(EosDesignsRootModel):
         class FeatureSupport(AvdModel):
             """Subclass of AvdModel."""
 
+            class PlatformSfeInterfaceProfile(AvdModel):
+                """Subclass of AvdModel."""
+
+                _fields: ClassVar[dict] = {"supported": {"type": bool, "default": False}, "max_rx_queues": {"type": int, "default": 6}}
+                supported: bool
+                """
+                Capability flag for generation of SFE interface profile.
+
+                Default value: `False`
+                """
+                max_rx_queues: int
+                """
+                Maximum rx_queue count supported on any interface.
+
+                Default value: `6`
+                """
+
+                if TYPE_CHECKING:
+
+                    def __init__(self, *, supported: bool | UndefinedType = Undefined, max_rx_queues: int | UndefinedType = Undefined) -> None:
+                        """
+                        PlatformSfeInterfaceProfile.
+
+
+                        Subclass of AvdModel.
+
+                        Args:
+                            supported: Capability flag for generation of SFE interface profile.
+                            max_rx_queues: Maximum rx_queue count supported on any interface.
+
+                        """
+
             _fields: ClassVar[dict] = {
                 "queue_monitor_length_notify": {"type": bool, "default": True},
                 "interface_storm_control": {"type": bool, "default": True},
@@ -9765,6 +9906,7 @@ class EosDesigns(EosDesignsRootModel):
                 "per_interface_mtu": {"type": bool, "default": True},
                 "bgp_update_wait_install": {"type": bool, "default": True},
                 "bgp_update_wait_for_convergence": {"type": bool, "default": True},
+                "platform_sfe_interface_profile": {"type": PlatformSfeInterfaceProfile},
             }
             queue_monitor_length_notify: bool
             """Default value: `True`"""
@@ -9801,6 +9943,12 @@ class EosDesigns(EosDesignsRootModel):
 
             Default value: `True`
             """
+            platform_sfe_interface_profile: PlatformSfeInterfaceProfile
+            """
+            Support for Platform SFE Interface Profiles.
+
+            Subclass of AvdModel.
+            """
 
             if TYPE_CHECKING:
 
@@ -9813,6 +9961,7 @@ class EosDesigns(EosDesignsRootModel):
                     per_interface_mtu: bool | UndefinedType = Undefined,
                     bgp_update_wait_install: bool | UndefinedType = Undefined,
                     bgp_update_wait_for_convergence: bool | UndefinedType = Undefined,
+                    platform_sfe_interface_profile: PlatformSfeInterfaceProfile | UndefinedType = Undefined,
                 ) -> None:
                     """
                     FeatureSupport.
@@ -9841,6 +9990,10 @@ class EosDesigns(EosDesignsRootModel):
                            that may not yet be installed into the forwarding plane.
                            Can be overridden by setting
                            "bgp_update_wait_for_convergence" host/group_vars.
+                        platform_sfe_interface_profile:
+                           Support for Platform SFE Interface Profiles.
+
+                           Subclass of AvdModel.
 
                     """
 
@@ -19279,6 +19432,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -19327,6 +19527,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -19472,6 +19673,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -19511,6 +19721,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -19611,6 +19822,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -19632,12 +19850,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -19664,6 +19930,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -19677,6 +19952,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -19701,6 +19977,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -23128,6 +23411,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                         """
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             class FlowTracking(AvdModel):
                                 """Subclass of AvdModel."""
 
@@ -23178,6 +23508,7 @@ class EosDesigns(EosDesignsRootModel):
                                 "wan_circuit_id": {"type": str},
                                 "connected_to_pathfinder": {"type": bool, "default": True},
                                 "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                                "rx_queue": {"type": RxQueue},
                                 "raw_eos_cli": {"type": str},
                                 "flow_tracking": {"type": FlowTracking},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -23323,6 +23654,15 @@ class EosDesigns(EosDesignsRootModel):
 
                             Subclass of AvdModel.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             raw_eos_cli: str | None
                             """EOS CLI rendered directly on the interface in the final EOS configuration."""
                             flow_tracking: FlowTracking
@@ -23362,6 +23702,7 @@ class EosDesigns(EosDesignsRootModel):
                                     wan_circuit_id: str | None | UndefinedType = Undefined,
                                     connected_to_pathfinder: bool | UndefinedType = Undefined,
                                     cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     raw_eos_cli: str | None | UndefinedType = Undefined,
                                     flow_tracking: FlowTracking | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -23462,6 +23803,13 @@ class EosDesigns(EosDesignsRootModel):
                                            PREVIEW: This key is in preview mode
 
                                            Subclass of AvdModel.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                         flow_tracking:
                                            Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -23483,12 +23831,60 @@ class EosDesigns(EosDesignsRootModel):
                             class MemberInterfacesItem(AvdModel):
                                 """Subclass of AvdModel."""
 
+                                class RxQueue(AvdModel):
+                                    """Subclass of AvdModel."""
+
+                                    class Workers(AvdList[str]):
+                                        """Subclass of AvdList with `str` items."""
+
+                                    Workers._item_type = str
+
+                                    _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                    count: int | None
+                                    """
+                                    Number of receive queues.
+                                    The maximum value is determined by
+                                    `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                    `platform` set on this device.
+                                    """
+                                    workers: Workers
+                                    """Subclass of AvdList with `str` items."""
+                                    mode: Literal["shared", "exclusive"] | None
+                                    """Mode applicable to the workers."""
+
+                                    if TYPE_CHECKING:
+
+                                        def __init__(
+                                            self,
+                                            *,
+                                            count: int | None | UndefinedType = Undefined,
+                                            workers: Workers | UndefinedType = Undefined,
+                                            mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                        ) -> None:
+                                            """
+                                            RxQueue.
+
+
+                                            Subclass of AvdModel.
+
+                                            Args:
+                                                count:
+                                                   Number of receive queues.
+                                                   The maximum value is determined by
+                                                   `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                                   `platform` set on this device.
+                                                workers: Subclass of AvdList with `str` items.
+                                                mode: Mode applicable to the workers.
+
+                                            """
+
                                 _fields: ClassVar[dict] = {
                                     "name": {"type": str},
                                     "description": {"type": str},
                                     "peer": {"type": str},
                                     "peer_interface": {"type": str},
                                     "speed": {"type": str},
+                                    "rx_queue": {"type": RxQueue},
                                     "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                                 }
                                 name: str
@@ -23515,6 +23911,15 @@ class EosDesigns(EosDesignsRootModel):
                                 Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                 <interface_speed>`.
                                 """
+                                rx_queue: RxQueue
+                                """
+                                Receive queue parameters for platform SFE interface profile.
+                                This setting is ignored unless the
+                                `platform_sfe_interface_profile.supported` is set as `true` under
+                                `platform_settings.feature_support` for the `platform` set on this device.
+
+                                Subclass of AvdModel.
+                                """
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem
                                 """Custom structured config for the member ethernet interface."""
 
@@ -23528,6 +23933,7 @@ class EosDesigns(EosDesignsRootModel):
                                         peer: str | None | UndefinedType = Undefined,
                                         peer_interface: str | None | UndefinedType = Undefined,
                                         speed: str | None | UndefinedType = Undefined,
+                                        rx_queue: RxQueue | UndefinedType = Undefined,
                                         structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                     ) -> None:
                                         """
@@ -23552,6 +23958,13 @@ class EosDesigns(EosDesignsRootModel):
                                             speed:
                                                Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                                <interface_speed>`.
+                                            rx_queue:
+                                               Receive queue parameters for platform SFE interface profile.
+                                               This setting is ignored unless the
+                                               `platform_sfe_interface_profile.supported` is set as `true` under
+                                               `platform_settings.feature_support` for the `platform` set on this device.
+
+                                               Subclass of AvdModel.
                                             structured_config: Custom structured config for the member ethernet interface.
 
                                         """
@@ -26939,6 +27352,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -26987,6 +27447,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -27132,6 +27593,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -27171,6 +27641,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -27271,6 +27742,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -27292,12 +27770,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -27324,6 +27850,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -27337,6 +27872,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -27361,6 +27897,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -30806,6 +31349,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -30854,6 +31444,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -30999,6 +31590,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -31038,6 +31638,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -31138,6 +31739,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -31159,12 +31767,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -31191,6 +31847,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -31204,6 +31869,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -31228,6 +31894,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -41352,6 +42025,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -41400,6 +42120,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -41545,6 +42266,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -41584,6 +42314,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -41684,6 +42415,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -41705,12 +42443,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -41737,6 +42523,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -41750,6 +42545,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -41774,6 +42570,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -45201,6 +46004,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                         """
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             class FlowTracking(AvdModel):
                                 """Subclass of AvdModel."""
 
@@ -45251,6 +46101,7 @@ class EosDesigns(EosDesignsRootModel):
                                 "wan_circuit_id": {"type": str},
                                 "connected_to_pathfinder": {"type": bool, "default": True},
                                 "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                                "rx_queue": {"type": RxQueue},
                                 "raw_eos_cli": {"type": str},
                                 "flow_tracking": {"type": FlowTracking},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -45396,6 +46247,15 @@ class EosDesigns(EosDesignsRootModel):
 
                             Subclass of AvdModel.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             raw_eos_cli: str | None
                             """EOS CLI rendered directly on the interface in the final EOS configuration."""
                             flow_tracking: FlowTracking
@@ -45435,6 +46295,7 @@ class EosDesigns(EosDesignsRootModel):
                                     wan_circuit_id: str | None | UndefinedType = Undefined,
                                     connected_to_pathfinder: bool | UndefinedType = Undefined,
                                     cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     raw_eos_cli: str | None | UndefinedType = Undefined,
                                     flow_tracking: FlowTracking | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -45535,6 +46396,13 @@ class EosDesigns(EosDesignsRootModel):
                                            PREVIEW: This key is in preview mode
 
                                            Subclass of AvdModel.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                         flow_tracking:
                                            Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -45556,12 +46424,60 @@ class EosDesigns(EosDesignsRootModel):
                             class MemberInterfacesItem(AvdModel):
                                 """Subclass of AvdModel."""
 
+                                class RxQueue(AvdModel):
+                                    """Subclass of AvdModel."""
+
+                                    class Workers(AvdList[str]):
+                                        """Subclass of AvdList with `str` items."""
+
+                                    Workers._item_type = str
+
+                                    _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                    count: int | None
+                                    """
+                                    Number of receive queues.
+                                    The maximum value is determined by
+                                    `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                    `platform` set on this device.
+                                    """
+                                    workers: Workers
+                                    """Subclass of AvdList with `str` items."""
+                                    mode: Literal["shared", "exclusive"] | None
+                                    """Mode applicable to the workers."""
+
+                                    if TYPE_CHECKING:
+
+                                        def __init__(
+                                            self,
+                                            *,
+                                            count: int | None | UndefinedType = Undefined,
+                                            workers: Workers | UndefinedType = Undefined,
+                                            mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                        ) -> None:
+                                            """
+                                            RxQueue.
+
+
+                                            Subclass of AvdModel.
+
+                                            Args:
+                                                count:
+                                                   Number of receive queues.
+                                                   The maximum value is determined by
+                                                   `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                                   `platform` set on this device.
+                                                workers: Subclass of AvdList with `str` items.
+                                                mode: Mode applicable to the workers.
+
+                                            """
+
                                 _fields: ClassVar[dict] = {
                                     "name": {"type": str},
                                     "description": {"type": str},
                                     "peer": {"type": str},
                                     "peer_interface": {"type": str},
                                     "speed": {"type": str},
+                                    "rx_queue": {"type": RxQueue},
                                     "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                                 }
                                 name: str
@@ -45588,6 +46504,15 @@ class EosDesigns(EosDesignsRootModel):
                                 Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                 <interface_speed>`.
                                 """
+                                rx_queue: RxQueue
+                                """
+                                Receive queue parameters for platform SFE interface profile.
+                                This setting is ignored unless the
+                                `platform_sfe_interface_profile.supported` is set as `true` under
+                                `platform_settings.feature_support` for the `platform` set on this device.
+
+                                Subclass of AvdModel.
+                                """
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem
                                 """Custom structured config for the member ethernet interface."""
 
@@ -45601,6 +46526,7 @@ class EosDesigns(EosDesignsRootModel):
                                         peer: str | None | UndefinedType = Undefined,
                                         peer_interface: str | None | UndefinedType = Undefined,
                                         speed: str | None | UndefinedType = Undefined,
+                                        rx_queue: RxQueue | UndefinedType = Undefined,
                                         structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                     ) -> None:
                                         """
@@ -45625,6 +46551,13 @@ class EosDesigns(EosDesignsRootModel):
                                             speed:
                                                Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                                <interface_speed>`.
+                                            rx_queue:
+                                               Receive queue parameters for platform SFE interface profile.
+                                               This setting is ignored unless the
+                                               `platform_sfe_interface_profile.supported` is set as `true` under
+                                               `platform_settings.feature_support` for the `platform` set on this device.
+
+                                               Subclass of AvdModel.
                                             structured_config: Custom structured config for the member ethernet interface.
 
                                         """
@@ -49012,6 +49945,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -49060,6 +50040,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -49205,6 +50186,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -49244,6 +50234,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -49344,6 +50335,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -49365,12 +50363,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -49397,6 +50443,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -49410,6 +50465,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -49434,6 +50490,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -52879,6 +53942,53 @@ class EosDesigns(EosDesignsRootModel):
 
                                     """
 
+                        class RxQueue(AvdModel):
+                            """Subclass of AvdModel."""
+
+                            class Workers(AvdList[str]):
+                                """Subclass of AvdList with `str` items."""
+
+                            Workers._item_type = str
+
+                            _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                            count: int | None
+                            """
+                            Number of receive queues.
+                            The maximum value is determined by
+                            `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                            `platform` set on this device.
+                            """
+                            workers: Workers
+                            """Subclass of AvdList with `str` items."""
+                            mode: Literal["shared", "exclusive"] | None
+                            """Mode applicable to the workers."""
+
+                            if TYPE_CHECKING:
+
+                                def __init__(
+                                    self,
+                                    *,
+                                    count: int | None | UndefinedType = Undefined,
+                                    workers: Workers | UndefinedType = Undefined,
+                                    mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                ) -> None:
+                                    """
+                                    RxQueue.
+
+
+                                    Subclass of AvdModel.
+
+                                    Args:
+                                        count:
+                                           Number of receive queues.
+                                           The maximum value is determined by
+                                           `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                           `platform` set on this device.
+                                        workers: Subclass of AvdList with `str` items.
+                                        mode: Mode applicable to the workers.
+
+                                    """
+
                         class FlowTracking(AvdModel):
                             """Subclass of AvdModel."""
 
@@ -52927,6 +54037,7 @@ class EosDesigns(EosDesignsRootModel):
                             "wan_circuit_id": {"type": str},
                             "connected_to_pathfinder": {"type": bool, "default": True},
                             "cv_pathfinder_internet_exit": {"type": CvPathfinderInternetExit},
+                            "rx_queue": {"type": RxQueue},
                             "raw_eos_cli": {"type": str},
                             "flow_tracking": {"type": FlowTracking},
                             "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
@@ -53072,6 +54183,15 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdModel.
                         """
+                        rx_queue: RxQueue
+                        """
+                        Receive queue parameters for platform SFE interface profile.
+                        This setting is ignored unless the
+                        `platform_sfe_interface_profile.supported` is set as `true` under
+                        `platform_settings.feature_support` for the `platform` set on this device.
+
+                        Subclass of AvdModel.
+                        """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the interface in the final EOS configuration."""
                         flow_tracking: FlowTracking
@@ -53111,6 +54231,7 @@ class EosDesigns(EosDesignsRootModel):
                                 wan_circuit_id: str | None | UndefinedType = Undefined,
                                 connected_to_pathfinder: bool | UndefinedType = Undefined,
                                 cv_pathfinder_internet_exit: CvPathfinderInternetExit | UndefinedType = Undefined,
+                                rx_queue: RxQueue | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                                 flow_tracking: FlowTracking | UndefinedType = Undefined,
                                 structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
@@ -53211,6 +54332,13 @@ class EosDesigns(EosDesignsRootModel):
                                        PREVIEW: This key is in preview mode
 
                                        Subclass of AvdModel.
+                                    rx_queue:
+                                       Receive queue parameters for platform SFE interface profile.
+                                       This setting is ignored unless the
+                                       `platform_sfe_interface_profile.supported` is set as `true` under
+                                       `platform_settings.feature_support` for the `platform` set on this device.
+
+                                       Subclass of AvdModel.
                                     raw_eos_cli: EOS CLI rendered directly on the interface in the final EOS configuration.
                                     flow_tracking:
                                        Configures flow-tracking on the interface. Overrides `fabric_flow_tracking.l3_interfaces` setting.
@@ -53232,12 +54360,60 @@ class EosDesigns(EosDesignsRootModel):
                         class MemberInterfacesItem(AvdModel):
                             """Subclass of AvdModel."""
 
+                            class RxQueue(AvdModel):
+                                """Subclass of AvdModel."""
+
+                                class Workers(AvdList[str]):
+                                    """Subclass of AvdList with `str` items."""
+
+                                Workers._item_type = str
+
+                                _fields: ClassVar[dict] = {"count": {"type": int}, "workers": {"type": Workers}, "mode": {"type": str}}
+                                count: int | None
+                                """
+                                Number of receive queues.
+                                The maximum value is determined by
+                                `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                `platform` set on this device.
+                                """
+                                workers: Workers
+                                """Subclass of AvdList with `str` items."""
+                                mode: Literal["shared", "exclusive"] | None
+                                """Mode applicable to the workers."""
+
+                                if TYPE_CHECKING:
+
+                                    def __init__(
+                                        self,
+                                        *,
+                                        count: int | None | UndefinedType = Undefined,
+                                        workers: Workers | UndefinedType = Undefined,
+                                        mode: Literal["shared", "exclusive"] | None | UndefinedType = Undefined,
+                                    ) -> None:
+                                        """
+                                        RxQueue.
+
+
+                                        Subclass of AvdModel.
+
+                                        Args:
+                                            count:
+                                               Number of receive queues.
+                                               The maximum value is determined by
+                                               `platform_sfe_interface_profile.max_rx_queues` under `platform_settings.feature_support` for the
+                                               `platform` set on this device.
+                                            workers: Subclass of AvdList with `str` items.
+                                            mode: Mode applicable to the workers.
+
+                                        """
+
                             _fields: ClassVar[dict] = {
                                 "name": {"type": str},
                                 "description": {"type": str},
                                 "peer": {"type": str},
                                 "peer_interface": {"type": str},
                                 "speed": {"type": str},
+                                "rx_queue": {"type": RxQueue},
                                 "structured_config": {"type": EosCliConfigGen.EthernetInterfacesItem},
                             }
                             name: str
@@ -53264,6 +54440,15 @@ class EosDesigns(EosDesignsRootModel):
                             Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                             <interface_speed>`.
                             """
+                            rx_queue: RxQueue
+                            """
+                            Receive queue parameters for platform SFE interface profile.
+                            This setting is ignored unless the
+                            `platform_sfe_interface_profile.supported` is set as `true` under
+                            `platform_settings.feature_support` for the `platform` set on this device.
+
+                            Subclass of AvdModel.
+                            """
                             structured_config: EosCliConfigGen.EthernetInterfacesItem
                             """Custom structured config for the member ethernet interface."""
 
@@ -53277,6 +54462,7 @@ class EosDesigns(EosDesignsRootModel):
                                     peer: str | None | UndefinedType = Undefined,
                                     peer_interface: str | None | UndefinedType = Undefined,
                                     speed: str | None | UndefinedType = Undefined,
+                                    rx_queue: RxQueue | UndefinedType = Undefined,
                                     structured_config: EosCliConfigGen.EthernetInterfacesItem | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -53301,6 +54487,13 @@ class EosDesigns(EosDesignsRootModel):
                                         speed:
                                            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto
                                            <interface_speed>`.
+                                        rx_queue:
+                                           Receive queue parameters for platform SFE interface profile.
+                                           This setting is ignored unless the
+                                           `platform_sfe_interface_profile.supported` is set as `true` under
+                                           `platform_settings.feature_support` for the `platform` set on this device.
+
+                                           Subclass of AvdModel.
                                         structured_config: Custom structured config for the member ethernet interface.
 
                                     """
@@ -55687,12 +56880,25 @@ class EosDesigns(EosDesignsRootModel):
                         "reload_delay": {"mlag": 300, "non_mlag": 330},
                     },
                     {
-                        "platforms": ["AWE-5310", "AWE-5510", "AWE-7250R", "AWE-7230R"],
+                        "platforms": ["AWE-5310", "AWE-7230R"],
                         "feature_support": {
                             "bgp_update_wait_for_convergence": True,
                             "bgp_update_wait_install": False,
                             "interface_storm_control": False,
                             "queue_monitor_length_notify": False,
+                            "platform_sfe_interface_profile": {"supported": True, "max_rx_queues": 6},
+                        },
+                        "management_interface": "Management1/1",
+                        "p2p_uplinks_mtu": 9194,
+                    },
+                    {
+                        "platforms": ["AWE-5510", "AWE-7250R"],
+                        "feature_support": {
+                            "bgp_update_wait_for_convergence": True,
+                            "bgp_update_wait_install": False,
+                            "interface_storm_control": False,
+                            "queue_monitor_length_notify": False,
+                            "platform_sfe_interface_profile": {"supported": True, "max_rx_queues": 16},
                         },
                         "management_interface": "Management1/1",
                         "p2p_uplinks_mtu": 9194,
@@ -57097,7 +58303,7 @@ class EosDesigns(EosDesignsRootModel):
     `custom_platform_settings` will be matched before the equivalent entries from `platform_settings`.
     Subclass of AvdList with `PlatformSettingsItem` items.
 
-    Default value: `lambda cls: coerce_type([{"platforms": ["default"], "feature_support": {"queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7050X3"], "feature_support": {"queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}, "trident_forwarding_table_partition": "flexible exact-match 16384 l2-shared 98304 l3-shared 131072"}, {"platforms": ["720XP"], "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}, "trident_forwarding_table_partition": "flexible exact-match 16000 l2-shared 18000 l3-shared 22000"}, {"platforms": ["750", "755", "758"], "management_interface": "Management0", "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["720DP", "722XP", "710P"], "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7010TX"], "feature_support": {"queue_monitor_length_notify": False, "per_interface_mtu": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7280R", "7280R2", "7020R"], "lag_hardware_only": True, "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7280R3"], "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7500R", "7500R2"], "lag_hardware_only": True, "management_interface": "Management0", "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7500R3", "7800R3"], "management_interface": "Management0", "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7358X4"], "management_interface": "Management1/1", "reload_delay": {"mlag": 300, "non_mlag": 330}, "feature_support": {"queue_monitor_length_notify": False, "interface_storm_control": True, "bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False}}, {"platforms": ["7368X4"], "management_interface": "Management0", "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7300X3"], "management_interface": "Management0", "reload_delay": {"mlag": 1200, "non_mlag": 1320}, "trident_forwarding_table_partition": "flexible exact-match 16384 l2-shared 98304 l3-shared 131072"}, {"platforms": ["VEOS", "VEOS-LAB", "vEOS", "vEOS-lab"], "feature_support": {"bgp_update_wait_for_convergence": False, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["CEOS", "cEOS", "ceos", "cEOSLab"], "feature_support": {"bgp_update_wait_for_convergence": False, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False}, "management_interface": "Management0", "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["AWE-5310", "AWE-5510", "AWE-7250R", "AWE-7230R"], "feature_support": {"bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False}, "management_interface": "Management1/1", "p2p_uplinks_mtu": 9194}, {"platforms": ["AWE-7220R"], "feature_support": {"bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False, "poe": True}, "management_interface": "Management1", "p2p_uplinks_mtu": 9194}], target_type=cls)`
+    Default value: `lambda cls: coerce_type([{"platforms": ["default"], "feature_support": {"queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7050X3"], "feature_support": {"queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}, "trident_forwarding_table_partition": "flexible exact-match 16384 l2-shared 98304 l3-shared 131072"}, {"platforms": ["720XP"], "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}, "trident_forwarding_table_partition": "flexible exact-match 16000 l2-shared 18000 l3-shared 22000"}, {"platforms": ["750", "755", "758"], "management_interface": "Management0", "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["720DP", "722XP", "710P"], "feature_support": {"poe": True, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7010TX"], "feature_support": {"queue_monitor_length_notify": False, "per_interface_mtu": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7280R", "7280R2", "7020R"], "lag_hardware_only": True, "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7280R3"], "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7500R", "7500R2"], "lag_hardware_only": True, "management_interface": "Management0", "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7500R3", "7800R3"], "management_interface": "Management0", "reload_delay": {"mlag": 900, "non_mlag": 1020}, "tcam_profile": "vxlan-routing"}, {"platforms": ["7358X4"], "management_interface": "Management1/1", "reload_delay": {"mlag": 300, "non_mlag": 330}, "feature_support": {"queue_monitor_length_notify": False, "interface_storm_control": True, "bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False}}, {"platforms": ["7368X4"], "management_interface": "Management0", "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["7300X3"], "management_interface": "Management0", "reload_delay": {"mlag": 1200, "non_mlag": 1320}, "trident_forwarding_table_partition": "flexible exact-match 16384 l2-shared 98304 l3-shared 131072"}, {"platforms": ["VEOS", "VEOS-LAB", "vEOS", "vEOS-lab"], "feature_support": {"bgp_update_wait_for_convergence": False, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False}, "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["CEOS", "cEOS", "ceos", "cEOSLab"], "feature_support": {"bgp_update_wait_for_convergence": False, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False}, "management_interface": "Management0", "reload_delay": {"mlag": 300, "non_mlag": 330}}, {"platforms": ["AWE-5310", "AWE-7230R"], "feature_support": {"bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False, "platform_sfe_interface_profile": {"supported": True, "max_rx_queues": 6}}, "management_interface": "Management1/1", "p2p_uplinks_mtu": 9194}, {"platforms": ["AWE-5510", "AWE-7250R"], "feature_support": {"bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False, "platform_sfe_interface_profile": {"supported": True, "max_rx_queues": 16}}, "management_interface": "Management1/1", "p2p_uplinks_mtu": 9194}, {"platforms": ["AWE-7220R"], "feature_support": {"bgp_update_wait_for_convergence": True, "bgp_update_wait_install": False, "interface_storm_control": False, "queue_monitor_length_notify": False, "poe": True}, "management_interface": "Management1", "p2p_uplinks_mtu": 9194}], target_type=cls)`
     """
     platform_speed_groups: PlatformSpeedGroups
     """

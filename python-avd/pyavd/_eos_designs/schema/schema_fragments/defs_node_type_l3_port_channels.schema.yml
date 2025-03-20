@@ -68,6 +68,9 @@ $defs:
                 type: str
                 description: |-
                   Speed should be set in the format `<interface_speed>` or `forced <interface_speed>` or `auto <interface_speed>`.
+              rx_queue:
+                type: dict
+                $ref: "eos_designs#/$defs/rx_queue_settings"
               structured_config:
                 type: dict
                 relaxed_validation: true
