@@ -621,7 +621,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         class Login(AvdModel):
             """Subclass of AvdModel."""
 
-            _fields: ClassVar[dict] = {"default": {"type": str}, "console": {"type": str}}
+            _fields: ClassVar[dict] = {"default": {"type": str}, "command_api": {"type": str}, "console": {"type": str}}
             default: str | None
             """
             Login authentication method(s) as a string.
@@ -629,6 +629,15 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             - "group tacacs+ local"
             - "group MYGROUP none"
             - "group radius group MYGROUP local"
+            """
+            command_api: str | None
+            """
+            Command-API authentication method(s) as a string.
+            This feature is not yet visible in EOS.
+            This
+            feature only supports local authentication at the moment.
+            Examples:
+            - "local"
             """
             console: str | None
             """
@@ -642,7 +651,13 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
             if TYPE_CHECKING:
 
-                def __init__(self, *, default: str | None | UndefinedType = Undefined, console: str | None | UndefinedType = Undefined) -> None:
+                def __init__(
+                    self,
+                    *,
+                    default: str | None | UndefinedType = Undefined,
+                    command_api: str | None | UndefinedType = Undefined,
+                    console: str | None | UndefinedType = Undefined,
+                ) -> None:
                     """
                     Login.
 
@@ -656,6 +671,13 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                            - "group tacacs+ local"
                            - "group MYGROUP none"
                            - "group radius group MYGROUP local"
+                        command_api:
+                           Command-API authentication method(s) as a string.
+                           This feature is not yet visible in EOS.
+                           This
+                           feature only supports local authentication at the moment.
+                           Examples:  # fmt: skip
+                           - "local"
                         console:
                            Console authentication method(s) as a string.
                            Examples:  # fmt: skip

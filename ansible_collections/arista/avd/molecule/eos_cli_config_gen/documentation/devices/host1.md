@@ -1382,6 +1382,7 @@ aaa group server tacacs+ TACACS2
 | Type | Sub-type | User Stores |
 | ---- | -------- | ---------- |
 | Login | default | group TACACS local |
+| Login | command-api | local |
 | Login | console | local |
 
 AAA Authentication on-failure log has been enabled
@@ -1396,6 +1397,7 @@ Policy lockout has been enabled. After **3** failed login attempts within **900*
 
 ```eos
 aaa authentication login default group TACACS local
+aaa authentication login command-api local
 aaa authentication login console local
 aaa authentication enable default group TACACS local
 aaa authentication dot1x default group RADIUS1

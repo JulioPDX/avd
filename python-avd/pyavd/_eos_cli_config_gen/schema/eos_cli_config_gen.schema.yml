@@ -208,6 +208,19 @@ keys:
               - "group radius group MYGROUP local"
 
               '
+          command_api:
+            type: str
+            description: 'Command-API authentication method(s) as a string.
+
+              This feature is not yet visible in EOS.
+
+              This feature only supports local authentication at the moment.
+
+              Examples:
+
+              - "local"
+
+              '
           console:
             type: str
             description: 'Console authentication method(s) as a string.
