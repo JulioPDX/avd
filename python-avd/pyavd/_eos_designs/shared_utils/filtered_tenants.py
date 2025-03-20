@@ -200,6 +200,7 @@ class FilteredTenantsMixin(Protocol):
             vrf.l3_interfaces = vrf.l3_interfaces._filtered(
                 lambda l3_interface: bool(self.hostname in l3_interface.nodes and l3_interface.ip_addresses and l3_interface.interfaces)
             )
+            vrf.l3_port_channels = vrf.l3_port_channels._filtered(lambda l3_port_channel: bool(self.hostname == l3_port_channel.node))
             vrf.loopbacks = vrf.loopbacks._filtered(lambda loopback: loopback.node == self.hostname)
 
             if self.vtep is True:
@@ -238,7 +239,7 @@ class FilteredTenantsMixin(Protocol):
                 lambda rt: bool((not rt.nodes or self.hostname in rt.nodes) and rt.address_family and rt.route_target and rt.type in ["import", "export"])
             )
 
-            if vrf.svis or vrf.l3_interfaces or vrf.loopbacks or self.is_forced_vrf(vrf, tenant.name):
+            if vrf.svis or vrf.l3_interfaces or vrf.loopbacks or vrf.l3_port_channels or self.is_forced_vrf(vrf, tenant.name):
                 filtered_vrfs.append(vrf)
 
             if tenant_evpn_vlan_bundle := tenant.evpn_vlan_bundle:

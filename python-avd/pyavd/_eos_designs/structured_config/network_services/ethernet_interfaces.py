@@ -45,6 +45,9 @@ class EthernetInterfacesMixin(Protocol):
                     # to only contain entries with our hostname
                     self._set_l3_interfaces(vrf, tenant, subif_parent_interface_names)
 
+                    # Member ethernet ports for Port-Channel interface
+                    self._set_l3_port_channel_members(vrf)
+
         if self.shared_utils.network_services_l1:
             for tenant in self.shared_utils.filtered_tenants:
                 if not tenant.point_to_point_services:
@@ -57,6 +60,46 @@ class EthernetInterfacesMixin(Protocol):
 
         # Add interfaces used for Internet Exit policies
         self._set_internet_exit_policy_interfaces()
+
+    def _set_l3_port_channel_members(
+        self: AvdStructuredConfigNetworkServicesProtocol,
+        vrf: EosDesigns._DynamicKeys.DynamicNetworkServicesItem.NetworkServicesItem.VrfsItem,
+    ) -> None:
+        """Set the structured_config for ethernet_interfaces which are members of l3_port_channels."""
+        for l3_port_channel in vrf.l3_port_channels:
+            # sub-interface for l3_port_channel cannot have member eth ports
+            # skip any logic to generate member port config for such sub-interfaces
+            if "." in l3_port_channel.name:
+                continue
+
+            channel_group_id = l3_port_channel.name.removeprefix("Port-Channel")
+            for member_intf in l3_port_channel.member_interfaces:
+                interface_description = member_intf.description
+                # derive values for peer from parent L3 port-channel
+                # if not defined explicitly for member interface
+                peer = member_intf.peer if member_intf.peer else l3_port_channel.peer
+                if not interface_description:
+                    elems = [peer, member_intf.peer_interface]
+                    if elems:
+                        interface_description = "_".join([elem for elem in elems if elem])
+
+                ethernet_interface = EosCliConfigGen.EthernetInterfacesItem(
+                    name=member_intf.name,
+                    description=interface_description or None,
+                    peer_type="l3_port_channel_member",
+                    peer=peer or None,
+                    peer_interface=member_intf.peer_interface or None,
+                    shutdown=not l3_port_channel.enabled,
+                    speed=member_intf.speed if member_intf.speed else None,
+                )
+                ethernet_interface.channel_group.id = int(channel_group_id)
+                ethernet_interface.channel_group.mode = l3_port_channel.mode
+
+                if member_intf.structured_config:
+                    self.custom_structured_configs.nested.ethernet_interfaces.obtain(member_intf.name)._deepmerge(
+                        member_intf.structured_config, list_merge=self.custom_structured_configs.list_merge_strategy
+                    )
+                self.structured_config.ethernet_interfaces.append(ethernet_interface)
 
     def _set_l3_interfaces(
         self: AvdStructuredConfigNetworkServicesProtocol,
@@ -188,7 +231,6 @@ class EthernetInterfacesMixin(Protocol):
                         raise AristaAvdError(msg)
 
                     interface.pim.ipv4.sparse_mode = True
-
                 self.structured_config.ethernet_interfaces.append(interface)
 
     def _set_point_to_point_interfaces(
