@@ -85,6 +85,8 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;protocol</samp>](## "vlan_interfaces.[].ip_nat.source.static.[].protocol") | String |  |  | Valid Values:<br>- <code>udp</code><br>- <code>tcp</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;translated_ip</samp>](## "vlan_interfaces.[].ip_nat.source.static.[].translated_ip") | String | Required |  |  | IPv4 address. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;translated_port</samp>](## "vlan_interfaces.[].ip_nat.source.static.[].translated_port") | Integer |  |  | Min: 1<br>Max: 65535 | requires 'original_port'. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;dhcp_server_ipv4</samp>](## "vlan_interfaces.[].dhcp_server_ipv4") | Boolean |  |  |  | Enable IPv4 DHCP server. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;dhcp_server_ipv6</samp>](## "vlan_interfaces.[].dhcp_server_ipv6") | Boolean |  |  |  | Enable IPv6 DHCP server. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;ipv6_enable</samp>](## "vlan_interfaces.[].ipv6_enable") | Boolean |  |  |  |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;ipv6_address</samp>](## "vlan_interfaces.[].ipv6_address") | String |  |  |  | IPv6_address/Mask. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;ipv6_address_virtuals</samp>](## "vlan_interfaces.[].ipv6_address_virtuals") | List, items: String |  |  |  | The new "ipv6_address_virtuals" key support multiple virtual ipv6 addresses. |
@@ -406,6 +408,12 @@
 
                 # requires 'original_port'.
                 translated_port: <int; 1-65535>
+
+        # Enable IPv4 DHCP server.
+        dhcp_server_ipv4: <bool>
+
+        # Enable IPv6 DHCP server.
+        dhcp_server_ipv6: <bool>
         ipv6_enable: <bool>
 
         # IPv6_address/Mask.

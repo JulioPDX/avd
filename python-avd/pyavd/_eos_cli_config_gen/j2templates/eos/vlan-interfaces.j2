@@ -116,6 +116,12 @@ interface {{ vlan_interface.name }}
 {%         endif %}
    {{ destination_cli }}
 {%     endfor %}
+{%     if vlan_interface.dhcp_server_ipv4 is arista.avd.defined(true) %}
+   dhcp server ipv4
+{%     endif %}
+{%     if vlan_interface.dhcp_server_ipv6 is arista.avd.defined(true) %}
+   dhcp server ipv6
+{%     endif %}
 {%     if vlan_interface.ip_attached_host_route_export.enabled is arista.avd.defined(true) %}
 {%         set ip_attached_host_route_export_cli = "ip attached-host route export" %}
 {%         if vlan_interface.ip_attached_host_route_export.distance is arista.avd.defined %}

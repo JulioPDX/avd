@@ -1867,6 +1867,7 @@ dhcp server vrf VRF01
 | -------------- | --------- | --------- |
 | Ethernet64 | True | True |
 | Port-Channel112 | True | True |
+| Vlan2002 | True | True |
 
 ## System Boot Settings
 
@@ -6568,6 +6569,8 @@ interface Vlan2002
    no autostate
    vrf Tenant_B
    ip verify unicast source reachable-via rx
+   dhcp server ipv4
+   dhcp server ipv6
    isis enable EVPN_UNDERLAY
    isis bfd
    isis authentication mode md5 rx-disabled

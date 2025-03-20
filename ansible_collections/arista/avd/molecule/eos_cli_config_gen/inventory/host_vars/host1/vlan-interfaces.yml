@@ -19,6 +19,8 @@ vlan_interfaces:
     ip_address_virtual: 10.2.2.1/24
     no_autostate: true
     isis_enable: "EVPN_UNDERLAY"
+    dhcp_server_ipv4: true
+    dhcp_server_ipv6: true
     isis_bfd: true
     ip_verify_unicast_source_reachable_via: rx
     # Test isis authentication both md5 rx
@@ -44,6 +46,8 @@ vlan_interfaces:
     vrf: Tenant_C
     ip_address_virtual: 10.10.81.1/24
     ipv6_enable: true
+    dhcp_server_ipv4: false
+    dhcp_server_ipv6: false
     ipv6_address_virtuals:
       - fc00:10:10:81::1/64
       - fc00:10:11:81::1/64

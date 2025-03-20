@@ -166,6 +166,12 @@ keys:
         ip_nat:
           type: dict
           $ref: "eos_cli_config_gen#/$defs/interface_ip_nat"
+        dhcp_server_ipv4:
+          type: bool
+          description: Enable IPv4 DHCP server.
+        dhcp_server_ipv6:
+          type: bool
+          description: Enable IPv6 DHCP server.
         ipv6_enable:
           type: bool
         ipv6_address:
