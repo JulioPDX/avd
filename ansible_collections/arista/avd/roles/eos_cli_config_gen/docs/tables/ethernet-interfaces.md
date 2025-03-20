@@ -385,6 +385,10 @@
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cos</samp>](## "ethernet_interfaces.[].qos.cos") | Integer |  |  |  | COS value. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;spanning_tree_bpdufilter</samp>](## "ethernet_interfaces.[].spanning_tree_bpdufilter") | String |  |  | Valid Values:<br>- <code>enabled</code><br>- <code>disabled</code><br>- <code>True</code><br>- <code>False</code><br>- <code>true</code><br>- <code>false</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;spanning_tree_bpduguard</samp>](## "ethernet_interfaces.[].spanning_tree_bpduguard") | String |  |  | Valid Values:<br>- <code>enabled</code><br>- <code>disabled</code><br>- <code>True</code><br>- <code>False</code><br>- <code>true</code><br>- <code>false</code> |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;spanning_tree_bpduguard_rate_limit</samp>](## "ethernet_interfaces.[].spanning_tree_bpduguard_rate_limit") | Dictionary |  |  |  |  |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled</samp>](## "ethernet_interfaces.[].spanning_tree_bpduguard_rate_limit.enabled") | Boolean |  |  |  | Enable/Disable rate limiter on this port. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count</samp>](## "ethernet_interfaces.[].spanning_tree_bpduguard_rate_limit.count") | Integer |  |  | Min: 1<br>Max: 20000 | Max number of BPDUs per timer interval. |
+    | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interval</samp>](## "ethernet_interfaces.[].spanning_tree_bpduguard_rate_limit.interval") | Integer |  |  | Min: 1<br>Max: 15 | Number of seconds in the BPDU input rate limiter timer. |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;spanning_tree_guard</samp>](## "ethernet_interfaces.[].spanning_tree_guard") | String |  |  | Valid Values:<br>- <code>loop</code><br>- <code>root</code><br>- <code>disabled</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;spanning_tree_portfast</samp>](## "ethernet_interfaces.[].spanning_tree_portfast") | String |  |  | Valid Values:<br>- <code>edge</code><br>- <code>network</code> |  |
     | [<samp>&nbsp;&nbsp;&nbsp;&nbsp;vmtracer</samp>](## "ethernet_interfaces.[].vmtracer") | Boolean |  |  |  |  |
@@ -1435,6 +1439,16 @@
           cos: <int>
         spanning_tree_bpdufilter: <str; "enabled" | "disabled" | "True" | "False" | "true" | "false">
         spanning_tree_bpduguard: <str; "enabled" | "disabled" | "True" | "False" | "true" | "false">
+        spanning_tree_bpduguard_rate_limit:
+
+          # Enable/Disable rate limiter on this port.
+          enabled: <bool>
+
+          # Max number of BPDUs per timer interval.
+          count: <int; 1-20000>
+
+          # Number of seconds in the BPDU input rate limiter timer.
+          interval: <int; 1-15>
         spanning_tree_guard: <str; "loop" | "root" | "disabled">
         spanning_tree_portfast: <str; "edge" | "network">
         vmtracer: <bool>

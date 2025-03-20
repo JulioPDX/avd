@@ -4104,6 +4104,8 @@ interface Ethernet2
    storm-control all level 10
    spanning-tree bpduguard disable
    spanning-tree bpdufilter disable
+   spanning-tree bpduguard rate-limit enable
+   spanning-tree bpduguard rate-limit count 10 interval 3
 !
 interface Ethernet3
    !! testing single line comment
@@ -4140,6 +4142,8 @@ interface Ethernet3
    ptp vlan 2
    no priority-flow-control
    spanning-tree guard root
+   spanning-tree bpduguard rate-limit disable
+   spanning-tree bpduguard rate-limit count 10
    switchport backup-link Ethernet4
    !
    sync-e
@@ -4172,6 +4176,7 @@ interface Ethernet4
    switchport port-security violation protect
    priority-flow-control on
    spanning-tree guard none
+   spanning-tree bpduguard rate-limit count 10 interval 15
 !
 interface Ethernet5
    description Molecule Routing

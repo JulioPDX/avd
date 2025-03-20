@@ -8655,6 +8655,39 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                     """
 
+        class SpanningTreeBpduguardRateLimit(AvdModel):
+            """Subclass of AvdModel."""
+
+            _fields: ClassVar[dict] = {"enabled": {"type": bool}, "count": {"type": int}, "interval": {"type": int}}
+            enabled: bool | None
+            """Enable/Disable rate limiter on this port."""
+            count: int | None
+            """Max number of BPDUs per timer interval."""
+            interval: int | None
+            """Number of seconds in the BPDU input rate limiter timer."""
+
+            if TYPE_CHECKING:
+
+                def __init__(
+                    self,
+                    *,
+                    enabled: bool | None | UndefinedType = Undefined,
+                    count: int | None | UndefinedType = Undefined,
+                    interval: int | None | UndefinedType = Undefined,
+                ) -> None:
+                    """
+                    SpanningTreeBpduguardRateLimit.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        enabled: Enable/Disable rate limiter on this port.
+                        count: Max number of BPDUs per timer interval.
+                        interval: Number of seconds in the BPDU input rate limiter timer.
+
+                    """
+
         class PriorityFlowControl(AvdModel):
             """Subclass of AvdModel."""
 
@@ -11447,6 +11480,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "qos": {"type": Qos},
             "spanning_tree_bpdufilter": {"type": str},
             "spanning_tree_bpduguard": {"type": str},
+            "spanning_tree_bpduguard_rate_limit": {"type": SpanningTreeBpduguardRateLimit},
             "spanning_tree_guard": {"type": str},
             "spanning_tree_portfast": {"type": str},
             "vmtracer": {"type": bool},
@@ -11681,6 +11715,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdModel."""
         spanning_tree_bpdufilter: Literal["enabled", "disabled", "True", "False", "true", "false"] | None
         spanning_tree_bpduguard: Literal["enabled", "disabled", "True", "False", "true", "false"] | None
+        spanning_tree_bpduguard_rate_limit: SpanningTreeBpduguardRateLimit
+        """Subclass of AvdModel."""
         spanning_tree_guard: Literal["loop", "root", "disabled"] | None
         spanning_tree_portfast: Literal["edge", "network"] | None
         vmtracer: bool | None
@@ -11838,6 +11874,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 qos: Qos | UndefinedType = Undefined,
                 spanning_tree_bpdufilter: Literal["enabled", "disabled", "True", "False", "true", "false"] | None | UndefinedType = Undefined,
                 spanning_tree_bpduguard: Literal["enabled", "disabled", "True", "False", "true", "false"] | None | UndefinedType = Undefined,
+                spanning_tree_bpduguard_rate_limit: SpanningTreeBpduguardRateLimit | UndefinedType = Undefined,
                 spanning_tree_guard: Literal["loop", "root", "disabled"] | None | UndefinedType = Undefined,
                 spanning_tree_portfast: Literal["edge", "network"] | None | UndefinedType = Undefined,
                 vmtracer: bool | None | UndefinedType = Undefined,
@@ -12004,6 +12041,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     qos: Subclass of AvdModel.
                     spanning_tree_bpdufilter: spanning_tree_bpdufilter
                     spanning_tree_bpduguard: spanning_tree_bpduguard
+                    spanning_tree_bpduguard_rate_limit: Subclass of AvdModel.
                     spanning_tree_guard: spanning_tree_guard
                     spanning_tree_portfast: spanning_tree_portfast
                     vmtracer: vmtracer

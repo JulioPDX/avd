@@ -3450,6 +3450,26 @@ keys:
           - 'False'
           - 'true'
           - 'false'
+        spanning_tree_bpduguard_rate_limit:
+          type: dict
+          keys:
+            enabled:
+              type: bool
+              description: Enable/Disable rate limiter on this port.
+            count:
+              type: int
+              convert_types:
+              - str
+              description: Max number of BPDUs per timer interval.
+              min: 1
+              max: 20000
+            interval:
+              type: int
+              convert_types:
+              - str
+              description: Number of seconds in the BPDU input rate limiter timer.
+              min: 1
+              max: 15
         spanning_tree_guard:
           type: str
           valid_values:
