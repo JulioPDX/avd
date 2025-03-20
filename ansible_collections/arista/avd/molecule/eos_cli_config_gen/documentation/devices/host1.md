@@ -5953,6 +5953,7 @@ interface Loopback100
    description TENANT_A_PROJECT02_VTEP_DIAGNOSTICS
    vrf TENANT_A_PROJECT02
    ip address 10.1.255.3/32
+   hardware forwarding id
 ```
 
 ### Tunnel Interfaces

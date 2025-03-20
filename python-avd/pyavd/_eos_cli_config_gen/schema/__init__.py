@@ -17633,6 +17633,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "isis_metric": {"type": int},
             "isis_network_point_to_point": {"type": bool},
             "node_segment": {"type": NodeSegment},
+            "hardware_forwarding_id": {"type": bool},
             "eos_cli": {"type": str},
         }
         name: str
@@ -17661,6 +17662,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         isis_network_point_to_point: bool | None
         node_segment: NodeSegment
         """Subclass of AvdModel."""
+        hardware_forwarding_id: bool | None
+        """Enable hardware forwarding for the VRF where this loopback interface belongs."""
         eos_cli: str | None
         """EOS CLI rendered directly on the loopback interface in the final EOS configuration."""
 
@@ -17686,6 +17689,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 isis_metric: int | None | UndefinedType = Undefined,
                 isis_network_point_to_point: bool | None | UndefinedType = Undefined,
                 node_segment: NodeSegment | UndefinedType = Undefined,
+                hardware_forwarding_id: bool | None | UndefinedType = Undefined,
                 eos_cli: str | None | UndefinedType = Undefined,
             ) -> None:
                 """
@@ -17712,6 +17716,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     isis_metric: isis_metric
                     isis_network_point_to_point: isis_network_point_to_point
                     node_segment: Subclass of AvdModel.
+                    hardware_forwarding_id: Enable hardware forwarding for the VRF where this loopback interface belongs.
                     eos_cli: EOS CLI rendered directly on the loopback interface in the final EOS configuration.
 
                 """
