@@ -63,6 +63,27 @@ AVD_TEST_INDEX: list[TestSpec] = [
         input_factory=VerifyLLDPNeighborsInputFactory,
     ),
     TestSpec(
+        test_class=VerifyMlagConfigSanity,
+        conditional_keys=[StructuredConfigKey.MLAG_CONFIGURATION],
+    ),
+    TestSpec(
+        test_class=VerifyMlagDualPrimary,
+        conditional_keys=[StructuredConfigKey.MLAG_DUAL_PRIMARY_DETECTION_DELAY],
+        input_factory=VerifyMlagDualPrimaryInputFactory,
+    ),
+    TestSpec(
+        test_class=VerifyMlagInterfaces,
+        conditional_keys=[StructuredConfigKey.MLAG_CONFIGURATION],
+    ),
+    TestSpec(
+        test_class=VerifyMlagReloadDelay,
+        conditional_keys=[StructuredConfigKey.RELOAD_DELAY_MLAG, StructuredConfigKey.RELOAD_DELAY_NON_MLAG],
+        input_dict={
+            "reload_delay": StructuredConfigKey.RELOAD_DELAY_MLAG,
+            "reload_delay_non_mlag": StructuredConfigKey.RELOAD_DELAY_NON_MLAG,
+        },
+    ),
+    TestSpec(
         test_class=VerifyMlagStatus,
         conditional_keys=[StructuredConfigKey.MLAG_CONFIGURATION],
     ),
