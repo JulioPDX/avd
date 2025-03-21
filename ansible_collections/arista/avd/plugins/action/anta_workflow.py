@@ -239,7 +239,7 @@ def build_reports(batch_results: list[ResultManager], report_settings: dict) -> 
         result_manager = result_manager.filter(hide=set(hide_statuses))
 
     # Sort the result manager
-    result_manager.sort(sort_by=["name", "categories", "test", "result", "custom_field"])
+    result_manager.sort(sort_by=["name", "categories", "test", "result"])
 
     # TODO: Consider using multiprocessing to generate reports in parallel
     if csv_output_path:

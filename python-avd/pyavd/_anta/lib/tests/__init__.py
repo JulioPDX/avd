@@ -10,7 +10,16 @@ from anta.tests.hardware import (
     VerifyTemperature,
     VerifyTransceiversTemperature,
 )
-from anta.tests.interfaces import VerifyInterfacesStatus
+from anta.tests.interfaces import (
+    VerifyIllegalLACP,
+    VerifyInterfaceDiscards,
+    VerifyInterfaceErrDisabled,
+    VerifyInterfaceErrors,
+    VerifyInterfacesStatus,
+    VerifyInterfaceUtilization,
+    VerifyPortChannels,
+    VerifyStormControlDrops,
+)
 from anta.tests.mlag import VerifyMlagStatus
 from anta.tests.routing.bgp import VerifyBGPPeerSession
 from anta.tests.routing.generic import VerifyRoutingProtocolModel
@@ -23,14 +32,21 @@ __all__ = [
     "VerifyAVTRole",
     "VerifyBGPPeerSession",
     "VerifyEnvironmentSystemCooling",
+    "VerifyIllegalLACP",
+    "VerifyInterfaceDiscards",
+    "VerifyInterfaceErrDisabled",
+    "VerifyInterfaceErrors",
+    "VerifyInterfaceUtilization",
     "VerifyInterfacesStatus",
     "VerifyLLDPNeighbors",
     "VerifyMlagStatus",
     "VerifyNTP",
+    "VerifyPortChannels",
     "VerifyReachability",
     "VerifyReloadCause",
     "VerifyRoutingProtocolModel",
     "VerifySpecificIPSecConn",
+    "VerifyStormControlDrops",
     "VerifyStunClientTranslation",
     "VerifyTemperature",
     "VerifyTransceiversTemperature",

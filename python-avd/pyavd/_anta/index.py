@@ -31,8 +31,31 @@ AVD_TEST_INDEX: list[TestSpec] = [
         test_class=VerifyEnvironmentSystemCooling,
     ),
     TestSpec(
+        test_class=VerifyIllegalLACP,
+        conditional_keys=[StructuredConfigKey.PORT_CHANNEL_INTERFACES],
+    ),
+    TestSpec(
+        test_class=VerifyInterfaceDiscards,
+    ),
+    TestSpec(
+        test_class=VerifyInterfaceErrDisabled,
+    ),
+    TestSpec(
+        test_class=VerifyInterfaceErrors,
+    ),
+    TestSpec(
+        test_class=VerifyInterfaceUtilization,
+    ),
+    TestSpec(
         test_class=VerifyInterfacesStatus,
         input_factory=VerifyInterfacesStatusInputFactory,
+    ),
+    TestSpec(
+        test_class=VerifyPortChannels,
+        conditional_keys=[StructuredConfigKey.PORT_CHANNEL_INTERFACES],
+    ),
+    TestSpec(
+        test_class=VerifyStormControlDrops,
     ),
     TestSpec(
         test_class=VerifyLLDPNeighbors,
