@@ -544,6 +544,7 @@ keys:
                   name:
                     type: str
                     description: Application name.
+                    required: true
                   service:
                     type: str
                     description: 'Service Name.
@@ -671,6 +672,7 @@ keys:
                   name:
                     type: str
                     description: Application Name.
+                    required: true
                   service:
                     type: str
                     description: 'Service Name.
@@ -716,6 +718,7 @@ keys:
                   name:
                     type: str
                     description: Name of a category.
+                    required: true
                   service:
                     type: str
                     description: 'Service Name.

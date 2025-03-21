@@ -1479,7 +1479,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 """Subclass of AvdModel."""
 
                 _fields: ClassVar[dict] = {"name": {"type": str}, "service": {"type": str}}
-                name: str | None
+                name: str
                 """Application name."""
                 service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"] | None
                 """
@@ -1496,7 +1496,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     def __init__(
                         self,
                         *,
-                        name: str | None | UndefinedType = Undefined,
+                        name: str | UndefinedType = Undefined,
                         service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"]
                         | None
                         | UndefinedType = Undefined,
@@ -2065,7 +2065,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 """Subclass of AvdModel."""
 
                 _fields: ClassVar[dict] = {"name": {"type": str}, "service": {"type": str}}
-                name: str | None
+                name: str
                 """Application Name."""
                 service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"] | None
                 """
@@ -2082,7 +2082,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     def __init__(
                         self,
                         *,
-                        name: str | None | UndefinedType = Undefined,
+                        name: str | UndefinedType = Undefined,
                         service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"]
                         | None
                         | UndefinedType = Undefined,
@@ -2119,7 +2119,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 """Subclass of AvdModel."""
 
                 _fields: ClassVar[dict] = {"name": {"type": str}, "service": {"type": str}}
-                name: str | None
+                name: str
                 """Name of a category."""
                 service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"] | None
                 """
@@ -2136,7 +2136,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     def __init__(
                         self,
                         *,
-                        name: str | None | UndefinedType = Undefined,
+                        name: str | UndefinedType = Undefined,
                         service: Literal["audio-video", "chat", "default", "file-transfer", "networking-protocols", "peer-to-peer", "software-update"]
                         | None
                         | UndefinedType = Undefined,
