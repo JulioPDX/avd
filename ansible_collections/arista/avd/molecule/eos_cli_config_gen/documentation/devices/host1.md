@@ -3822,8 +3822,8 @@ interface Dps1
 | Ethernet64 | DHCP server interface | - | 192.168.42.42/24 | default | - | - | - | - |
 | Ethernet65 | Multiple VRIDs | - | 192.0.2.2/25 | default | - | False | - | - |
 | Ethernet66 | Multiple VRIDs and tracking | - | 192.0.2.2/25 | default | - | False | - | - |
-| Ethernet80 | LAG Member | 17 | *192.0.2.3/31 | **default | **- | **- | **- | **- |
-| Ethernet81/2 | LAG Member LACP fallback LLDP ZTP VLAN | 112 | *dhcp | **default | **- | **- | **- | **- |
+| Ethernet80 | LAG Member | 17 | *192.0.2.3/31 | *default | *- | *- | *- | *- |
+| Ethernet81/2 | LAG Member LACP fallback LLDP ZTP VLAN | 112 | *dhcp | *default | *- | *- | *- | *- |
 | Ethernet81/3 | Traffic Engineering Interface | - | 100.64.127.0/31 | default | - | False | - | - |
 | Ethernet81/4 | Traffic Engineering Interface | - | 100.64.127.0/31 | default | - | False | - | - |
 
