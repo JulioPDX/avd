@@ -10469,6 +10469,10 @@ $defs:
                 interface of the peer."
             mode:
               type: str
+              valid_values:
+              - 'on'
+              - active
+              - passive
               default: active
             nodes_child_interfaces:
               type: list

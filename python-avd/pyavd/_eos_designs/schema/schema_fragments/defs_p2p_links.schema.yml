@@ -186,6 +186,7 @@ $defs:
                 By default the description is templated from the name and port_channel interface of the peer.
             mode:
               type: str
+              valid_values: ["on", "active", "passive"]
               default: active
             nodes_child_interfaces:
               type: list

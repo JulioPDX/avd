@@ -1099,7 +1099,7 @@ class EosDesigns(EosDesignsRootModel):
                 By default the description is templated from the
                 name and port_channel interface of the peer.
                 """
-                mode: str
+                mode: Literal["on", "active", "passive"]
                 """Default value: `"active"`"""
                 nodes_child_interfaces: NodesChildInterfaces
                 """Subclass of AvdIndexedList with `NodesChildInterfacesItem` items. Primary key is `node` (`str`)."""
@@ -1110,7 +1110,7 @@ class EosDesigns(EosDesignsRootModel):
                         self,
                         *,
                         description: str | None | UndefinedType = Undefined,
-                        mode: str | UndefinedType = Undefined,
+                        mode: Literal["on", "active", "passive"] | UndefinedType = Undefined,
                         nodes_child_interfaces: NodesChildInterfaces | UndefinedType = Undefined,
                     ) -> None:
                         """
@@ -1640,7 +1640,7 @@ class EosDesigns(EosDesignsRootModel):
                 By default the description is templated from the
                 name and port_channel interface of the peer.
                 """
-                mode: str
+                mode: Literal["on", "active", "passive"]
                 """Default value: `"active"`"""
                 nodes_child_interfaces: NodesChildInterfaces
                 """Subclass of AvdIndexedList with `NodesChildInterfacesItem` items. Primary key is `node` (`str`)."""
@@ -1651,7 +1651,7 @@ class EosDesigns(EosDesignsRootModel):
                         self,
                         *,
                         description: str | None | UndefinedType = Undefined,
-                        mode: str | UndefinedType = Undefined,
+                        mode: Literal["on", "active", "passive"] | UndefinedType = Undefined,
                         nodes_child_interfaces: NodesChildInterfaces | UndefinedType = Undefined,
                     ) -> None:
                         """
@@ -4969,7 +4969,7 @@ class EosDesigns(EosDesignsRootModel):
                 By default the description is templated from the
                 name and port_channel interface of the peer.
                 """
-                mode: str
+                mode: Literal["on", "active", "passive"]
                 """Default value: `"active"`"""
                 nodes_child_interfaces: NodesChildInterfaces
                 """Subclass of AvdIndexedList with `NodesChildInterfacesItem` items. Primary key is `node` (`str`)."""
@@ -4980,7 +4980,7 @@ class EosDesigns(EosDesignsRootModel):
                         self,
                         *,
                         description: str | None | UndefinedType = Undefined,
-                        mode: str | UndefinedType = Undefined,
+                        mode: Literal["on", "active", "passive"] | UndefinedType = Undefined,
                         nodes_child_interfaces: NodesChildInterfaces | UndefinedType = Undefined,
                     ) -> None:
                         """
@@ -5510,7 +5510,7 @@ class EosDesigns(EosDesignsRootModel):
                 By default the description is templated from the
                 name and port_channel interface of the peer.
                 """
-                mode: str
+                mode: Literal["on", "active", "passive"]
                 """Default value: `"active"`"""
                 nodes_child_interfaces: NodesChildInterfaces
                 """Subclass of AvdIndexedList with `NodesChildInterfacesItem` items. Primary key is `node` (`str`)."""
@@ -5521,7 +5521,7 @@ class EosDesigns(EosDesignsRootModel):
                         self,
                         *,
                         description: str | None | UndefinedType = Undefined,
-                        mode: str | UndefinedType = Undefined,
+                        mode: Literal["on", "active", "passive"] | UndefinedType = Undefined,
                         nodes_child_interfaces: NodesChildInterfaces | UndefinedType = Undefined,
                     ) -> None:
                         """
