@@ -43,4 +43,8 @@ class RouterOspfMixin(Protocol):
 
         if self.shared_utils.overlay_routing_protocol == "none":
             process.redistribute.connected.enabled = True
+
+        if self.inputs.underlay_ospf_graceful_restart:
+            process.graceful_restart.enabled = True
+
         self.structured_config.router_ospf.process_ids.append(process)
