@@ -89,7 +89,7 @@ class UtilsMixin(Protocol):
         return evpn_route_clients
 
     @cached_property
-    def _evpn_route_servers(self: AvdStructuredConfigOverlayProtocol) -> dict:
+    def _evpn_route_servers(self: AvdStructuredConfigOverlayProtocol) -> dict[str, [dict[str, str]]]:
         if not self.shared_utils.overlay_evpn:
             return {}
 
