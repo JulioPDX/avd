@@ -45236,6 +45236,38 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                         """
 
+            class GracefulRestart(AvdModel):
+                """Subclass of AvdModel."""
+
+                _fields: ClassVar[dict] = {"enabled": {"type": bool}, "restart_time": {"type": int}, "stalepath_time": {"type": int}}
+                enabled: bool
+                restart_time: int | None
+                """Number of seconds."""
+                stalepath_time: int | None
+                """Number of seconds."""
+
+                if TYPE_CHECKING:
+
+                    def __init__(
+                        self,
+                        *,
+                        enabled: bool | UndefinedType = Undefined,
+                        restart_time: int | None | UndefinedType = Undefined,
+                        stalepath_time: int | None | UndefinedType = Undefined,
+                    ) -> None:
+                        """
+                        GracefulRestart.
+
+
+                        Subclass of AvdModel.
+
+                        Args:
+                            enabled: enabled
+                            restart_time: Number of seconds.
+                            stalepath_time: Number of seconds.
+
+                        """
+
             class NetworksItem(AvdModel):
                 """Subclass of AvdModel."""
 
@@ -50604,6 +50636,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 "route_targets": {"type": RouteTargets},
                 "router_id": {"type": str},
                 "timers": {"type": str},
+                "graceful_restart": {"type": GracefulRestart},
                 "networks": {"type": Networks},
                 "maximum_paths": {"type": MaximumPaths},
                 "updates": {"type": Updates},
@@ -50649,6 +50682,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             """in IP address format A.B.C.D."""
             timers: str | None
             """BGP Keepalive and Hold Timer values in seconds as string "<0-3600> <0-3600>"."""
+            graceful_restart: GracefulRestart
+            """Subclass of AvdModel."""
             networks: Networks
             """Subclass of AvdIndexedList with `NetworksItem` items. Primary key is `prefix` (`str`)."""
             maximum_paths: MaximumPaths
@@ -50710,6 +50745,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     route_targets: RouteTargets | UndefinedType = Undefined,
                     router_id: str | None | UndefinedType = Undefined,
                     timers: str | None | UndefinedType = Undefined,
+                    graceful_restart: GracefulRestart | UndefinedType = Undefined,
                     networks: Networks | UndefinedType = Undefined,
                     maximum_paths: MaximumPaths | UndefinedType = Undefined,
                     updates: Updates | UndefinedType = Undefined,
@@ -50751,6 +50787,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                         route_targets: Subclass of AvdModel.
                         router_id: in IP address format A.B.C.D.
                         timers: BGP Keepalive and Hold Timer values in seconds as string "<0-3600> <0-3600>".
+                        graceful_restart: Subclass of AvdModel.
                         networks: Subclass of AvdIndexedList with `NetworksItem` items. Primary key is `prefix` (`str`).
                         maximum_paths: Subclass of AvdModel.
                         updates: Subclass of AvdModel.
