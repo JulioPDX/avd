@@ -7,6 +7,8 @@
 type: dict
 keys:
   underlay_ospf_graceful_restart:
+    documentation_options:
+      table: ospf-settings
     type: bool
     # TODO AVD 6.0 : Flip the default to true
     default: false
