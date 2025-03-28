@@ -118,8 +118,8 @@ class UtilsMixin(Protocol):
         hash_extra_value: str = "",
     ) -> str | None:
         """Return short_esi for one adapter."""
-        if len(set(adapter.switches)) < 2 or not self.shared_utils.overlay_evpn or not self.shared_utils.overlay_vtep:
-            # Only configure ESI for multi-homing.
+        if len(set(adapter.switches)) < 2 or not self.shared_utils.overlay_evpn or not (self.shared_utils.overlay_vtep or self.shared_utils.overlay_ler):
+            # Only configure ESI for EVPN multi-homing.
             return None
 
         # short_esi is only set when called from sub-interface port-channels.
