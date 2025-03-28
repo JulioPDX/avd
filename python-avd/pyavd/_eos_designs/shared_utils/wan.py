@@ -89,15 +89,6 @@ class WanMixin(Protocol):
         )
 
     @cached_property
-    def _wan_port_channel_member_interfaces(self: SharedUtilsProtocol) -> dict:
-        """Dictionary with mapping of member ethernet interface to wan port_channel for a device."""
-        member_intfs = {}
-        for port_channel_intf in self.wan_port_channels:
-            for member_eth_intf in port_channel_intf.member_interfaces:
-                member_intfs[member_eth_intf.name] = port_channel_intf.name
-        return member_intfs
-
-    @cached_property
     def wan_local_carriers(self: SharedUtilsProtocol) -> list:
         """
         List of carriers present on this router based on the wan_interfaces and wan_port_channels with the associated WAN interfaces.

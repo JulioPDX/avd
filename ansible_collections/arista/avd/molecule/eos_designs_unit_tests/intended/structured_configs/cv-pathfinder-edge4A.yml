@@ -210,14 +210,6 @@ metadata:
       tags:
       - name: Type
         value: lan
-    - interface: Ethernet42
-      tags:
-      - name: Type
-        value: lan
-    - interface: Ethernet43
-      tags:
-      - name: Type
-        value: lan
     - interface: Port-Channel666
       tags:
       - name: Type
