@@ -9098,6 +9098,11 @@ $defs:
               table: node-type-l2-mlag-configuration
             type: bool
             default: false
+          spanning_tree_mst_pvst_boundary:
+            documentation_options:
+              table: node-type-l2-mlag-configuration
+            type: bool
+            description: Enable MST PVST border ports.
           virtual_router_mac_address:
             documentation_options:
               table: node-type-l2-mlag-configuration

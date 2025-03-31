@@ -398,6 +398,9 @@ class AvdStructuredConfigBaseProtocol(NtpMixin, SnmpServerMixin, RouterGeneralMi
         if self.shared_utils.node_config.spanning_tree_root_super is True:
             self.structured_config.spanning_tree.root_super = True
 
+        if self.shared_utils.node_config.spanning_tree_mst_pvst_boundary:
+            self.structured_config.spanning_tree.mst.pvst_border = True
+
         if spanning_tree_mode is not None:
             self.structured_config.spanning_tree.mode = spanning_tree_mode
             priority = self.shared_utils.node_config.spanning_tree_priority
