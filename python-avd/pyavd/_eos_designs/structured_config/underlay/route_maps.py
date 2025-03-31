@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
 from pyavd._utils import get
+from pyavd.j2filters import natural_sort
 
 if TYPE_CHECKING:
     from . import AvdStructuredConfigUnderlayProtocol
@@ -89,13 +90,16 @@ class RouteMapsMixin(Protocol):
 
             self.structured_config.route_maps.append_new(name="RM-CONN-2-BGP", sequence_numbers=sequence_numbers)
 
-        # RM-BGP-AS{{ asn }}-OUT
-        for asn in self._underlay_filter_peer_as_route_maps_asns:
-            route_map_name = f"RM-BGP-AS{asn}-OUT"
-            sequence_numbers = EosCliConfigGen.RouteMapsItem.SequenceNumbers()
-            sequence_numbers.append_new(sequence=10, type="deny", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"as {asn}"]))
-            sequence_numbers.append_new(sequence=20, type="permit")
-            self.structured_config.route_maps.append_new(name=route_map_name, sequence_numbers=sequence_numbers)
+        if self.inputs.underlay_filter_peer_as:
+            # using set comprehension with `{}` to remove duplicates and then run natural_sort to convert to list.
+            underlay_filter_peer_as_route_maps_asns = natural_sort({link["peer_bgp_as"] for link in self._underlay_links if link["type"] == "underlay_p2p"})
+            # RM-BGP-AS{{ asn }}-OUT
+            for asn in underlay_filter_peer_as_route_maps_asns:
+                route_map_name = f"RM-BGP-AS{asn}-OUT"
+                sequence_numbers = EosCliConfigGen.RouteMapsItem.SequenceNumbers()
+                sequence_numbers.append_new(sequence=10, type="deny", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"as {asn}"]))
+                sequence_numbers.append_new(sequence=20, type="permit")
+                self.structured_config.route_maps.append_new(name=route_map_name, sequence_numbers=sequence_numbers)
 
         # Route-map IN and OUT for SOO, rendered for WAN routers
         if self.shared_utils.underlay_routing_protocol == "ebgp" and self.shared_utils.wan_role == "client":

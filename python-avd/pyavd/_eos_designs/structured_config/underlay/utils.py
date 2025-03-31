@@ -34,19 +34,10 @@ class UtilsMixin(Protocol):
         return natural_sort(get(self._hostvars, f"avd_topology_peers..{self.shared_utils.hostname}", separator="..", default=[]))
 
     @cached_property
-    def _underlay_filter_peer_as_route_maps_asns(self: AvdStructuredConfigUnderlayProtocol) -> list:
-        """Filtered ASNs."""
-        if not self.inputs.underlay_filter_peer_as:
-            return []
-
-        # using set comprehension with `{}` to remove duplicates and then run natural_sort to convert to list.
-        return natural_sort({link["peer_bgp_as"] for link in self._underlay_links if link["type"] == "underlay_p2p"})
-
-    @cached_property
     def _underlay_links(self: AvdStructuredConfigUnderlayProtocol) -> list:
         """Returns the list of underlay links for this device."""
         underlay_links = []
-        underlay_links.extend(self._uplinks)
+        underlay_links.extend(get(self._hostvars, "switch.uplinks"))
         if self.inputs.fabric_sflow.uplinks is not None:
             for uplink in underlay_links:
                 uplink.update({"sflow": {"enable": self.inputs.fabric_sflow.uplinks}})
@@ -111,37 +102,6 @@ class UtilsMixin(Protocol):
                     underlay_links.append(strip_empties_from_dict(link))
 
         return natural_sort(underlay_links, "interface")
-
-    @cached_property
-    def _underlay_vlan_trunk_groups(self: AvdStructuredConfigUnderlayProtocol) -> list:
-        """Returns a list of trunk groups to configure on the underlay link."""
-        if self.inputs.enable_trunk_groups is not True:
-            return []
-
-        trunk_groups = []
-
-        for peer in self._avd_peers:
-            peer_facts = self.shared_utils.get_peer_facts(peer, required=True)
-            for uplink in peer_facts["uplinks"]:
-                if uplink["peer"] == self.shared_utils.hostname:
-                    if (peer_trunk_groups := get(uplink, "peer_trunk_groups")) is None:
-                        continue
-
-                    trunk_groups.append(
-                        {
-                            "vlan_list": uplink["vlans"],
-                            "trunk_groups": peer_trunk_groups,
-                        },
-                    )
-
-        if trunk_groups:
-            return trunk_groups
-
-        return []
-
-    @cached_property
-    def _uplinks(self: AvdStructuredConfigUnderlayProtocol) -> list:
-        return get(self._hostvars, "switch.uplinks")
 
     # These overloads are just here to help the type checker enforce that input type x gives output type y
     @overload

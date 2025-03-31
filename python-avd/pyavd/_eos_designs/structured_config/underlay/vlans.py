@@ -34,10 +34,7 @@ class VlansMixin(Protocol):
         """
         # TODO: - can probably do this with sets but need list in the end so not sure it is worth it
         vlans = EosCliConfigGen.Vlans()
-        for vlan_trunk_group in self._underlay_vlan_trunk_groups:
-            for vlan in range_expand(vlan_trunk_group["vlan_list"]):
-                vlans.obtain(int(vlan)).trunk_groups.extend(vlan_trunk_group["trunk_groups"])
-
+        self._update_underlay_vlan_trunk_groups(vlans)
         for vlan in vlans:
             vlan.trunk_groups = EosCliConfigGen.VlansItem.TrunkGroups(natural_sort(set(vlan.trunk_groups)))
 
@@ -50,3 +47,19 @@ class VlansMixin(Protocol):
         )
         for peer_uplink_native_vlan in uplink_native_vlans:
             self.structured_config.vlans.append_new(id=int(peer_uplink_native_vlan), name="NATIVE", state="suspend")
+
+    def _update_underlay_vlan_trunk_groups(self: AvdStructuredConfigUnderlayProtocol, vlans: EosCliConfigGen.Vlans) -> None:
+        """Update trunk groups to configure on the underlay link."""
+        if self.inputs.enable_trunk_groups is not True:
+            return
+
+        for peer in self._avd_peers:
+            peer_facts = self.shared_utils.get_peer_facts(peer, required=True)
+            for uplink in peer_facts["uplinks"]:
+                if uplink["peer"] == self.shared_utils.hostname:
+                    if (peer_trunk_groups := get(uplink, "peer_trunk_groups")) is None:
+                        continue
+                    for vlan_id in map(int, range_expand(uplink["vlans"])):
+                        vlan_item_trunk_groups = vlans.obtain(vlan_id).trunk_groups
+                        for trunk_group in peer_trunk_groups:
+                            vlan_item_trunk_groups.append_unique(trunk_group)
