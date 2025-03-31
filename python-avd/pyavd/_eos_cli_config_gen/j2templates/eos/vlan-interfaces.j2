@@ -263,6 +263,13 @@ interface {{ vlan_interface.name }}
 {%         set interface_ip_nat = vlan_interface.ip_nat %}
 {%         include 'eos/interface-ip-nat.j2' %}
 {%     endif %}
+{%     if vlan_interface.ntp_serve is arista.avd.defined %}
+{%         if vlan_interface.ntp_serve %}
+   ntp serve
+{%         else %}
+   no ntp serve
+{%         endif %}
+{%     endif %}
 {%     if vlan_interface.ospf_cost is arista.avd.defined %}
    ip ospf cost {{ vlan_interface.ospf_cost }}
 {%     endif %}

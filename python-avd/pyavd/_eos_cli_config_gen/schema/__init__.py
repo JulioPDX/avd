@@ -11453,6 +11453,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "ospf_message_digest_keys": {"type": OspfMessageDigestKeys},
             "pim": {"type": Pim},
             "mac_security": {"type": MacSecurity},
+            "ntp_serve": {"type": bool},
             "tcp_mss_ceiling": {"type": TcpMssCeiling},
             "channel_group": {"type": ChannelGroup},
             "isis_enable": {"type": str},
@@ -11654,6 +11655,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdModel."""
         mac_security: MacSecurity
         """Subclass of AvdModel."""
+        ntp_serve: bool | None
+        """Enable/disable serving NTP to clients."""
         tcp_mss_ceiling: TcpMssCeiling
         """
         The TCP MSS clamping feature involves clamping the maximum segment size (MSS) in the TCP header
@@ -11847,6 +11850,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 ospf_message_digest_keys: OspfMessageDigestKeys | UndefinedType = Undefined,
                 pim: Pim | UndefinedType = Undefined,
                 mac_security: MacSecurity | UndefinedType = Undefined,
+                ntp_serve: bool | None | UndefinedType = Undefined,
                 tcp_mss_ceiling: TcpMssCeiling | UndefinedType = Undefined,
                 channel_group: ChannelGroup | UndefinedType = Undefined,
                 isis_enable: str | None | UndefinedType = Undefined,
@@ -12001,6 +12005,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     ospf_message_digest_keys: Subclass of AvdIndexedList with `OspfMessageDigestKeysItem` items. Primary key is `id` (`int`).
                     pim: Subclass of AvdModel.
                     mac_security: Subclass of AvdModel.
+                    ntp_serve: Enable/disable serving NTP to clients.
                     tcp_mss_ceiling:
                        The TCP MSS clamping feature involves clamping the maximum segment size (MSS) in the TCP header
                        of
@@ -24609,6 +24614,87 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
         AuthenticationKeys._item_type = AuthenticationKeysItem
 
+        class Serve(AvdModel):
+            """Subclass of AvdModel."""
+
+            class VrfsItem(AvdModel):
+                """Subclass of AvdModel."""
+
+                _fields: ClassVar[dict] = {
+                    "name": {"type": str},
+                    "serve_all": {"type": bool},
+                    "access_group": {"type": str},
+                    "ipv6_access_group": {"type": str},
+                }
+                name: str
+                serve_all: bool | None
+                access_group: str | None
+                ipv6_access_group: str | None
+
+                if TYPE_CHECKING:
+
+                    def __init__(
+                        self,
+                        *,
+                        name: str | UndefinedType = Undefined,
+                        serve_all: bool | None | UndefinedType = Undefined,
+                        access_group: str | None | UndefinedType = Undefined,
+                        ipv6_access_group: str | None | UndefinedType = Undefined,
+                    ) -> None:
+                        """
+                        VrfsItem.
+
+
+                        Subclass of AvdModel.
+
+                        Args:
+                            name: name
+                            serve_all: serve_all
+                            access_group: access_group
+                            ipv6_access_group: ipv6_access_group
+
+                        """
+
+            class Vrfs(AvdIndexedList[str, VrfsItem]):
+                """Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`)."""
+
+                _primary_key: ClassVar[str] = "name"
+
+            Vrfs._item_type = VrfsItem
+
+            _fields: ClassVar[dict] = {"serve_all": {"type": bool}, "access_group": {"type": str}, "ipv6_access_group": {"type": str}, "vrfs": {"type": Vrfs}}
+            serve_all: bool | None
+            access_group: str | None
+            """Standard ACL to apply to NTP serve. All ACLs are applied in the 'in' direction."""
+            ipv6_access_group: str | None
+            """Standard IPv6 ACL to apply to NTP serve. All ACLs are applied in the 'in' direction."""
+            vrfs: Vrfs
+            """Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`)."""
+
+            if TYPE_CHECKING:
+
+                def __init__(
+                    self,
+                    *,
+                    serve_all: bool | None | UndefinedType = Undefined,
+                    access_group: str | None | UndefinedType = Undefined,
+                    ipv6_access_group: str | None | UndefinedType = Undefined,
+                    vrfs: Vrfs | UndefinedType = Undefined,
+                ) -> None:
+                    """
+                    Serve.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        serve_all: serve_all
+                        access_group: Standard ACL to apply to NTP serve. All ACLs are applied in the 'in' direction.
+                        ipv6_access_group: Standard IPv6 ACL to apply to NTP serve. All ACLs are applied in the 'in' direction.
+                        vrfs: Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`).
+
+                    """
+
         _fields: ClassVar[dict] = {
             "local_interface": {"type": LocalInterface},
             "servers": {"type": Servers},
@@ -24616,6 +24702,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "authenticate_servers_only": {"type": bool},
             "authentication_keys": {"type": AuthenticationKeys},
             "trusted_keys": {"type": str},
+            "serve": {"type": Serve},
         }
         local_interface: LocalInterface
         """Subclass of AvdModel."""
@@ -24627,6 +24714,12 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdIndexedList with `AuthenticationKeysItem` items. Primary key is `id` (`int`)."""
         trusted_keys: str | None
         """List of trusted-keys as string ex. 10-12,15."""
+        serve: Serve
+        """
+        Enable Serving NTP to clients.
+
+        Subclass of AvdModel.
+        """
 
         if TYPE_CHECKING:
 
@@ -24639,6 +24732,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 authenticate_servers_only: bool | None | UndefinedType = Undefined,
                 authentication_keys: AuthenticationKeys | UndefinedType = Undefined,
                 trusted_keys: str | None | UndefinedType = Undefined,
+                serve: Serve | UndefinedType = Undefined,
             ) -> None:
                 """
                 Ntp.
@@ -24653,6 +24747,10 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     authenticate_servers_only: authenticate_servers_only
                     authentication_keys: Subclass of AvdIndexedList with `AuthenticationKeysItem` items. Primary key is `id` (`int`).
                     trusted_keys: List of trusted-keys as string ex. 10-12,15.
+                    serve:
+                       Enable Serving NTP to clients.
+
+                       Subclass of AvdModel.
 
                 """
 
@@ -30307,6 +30405,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "bfd": {"type": Bfd},
             "service_policy": {"type": ServicePolicy},
             "mpls": {"type": Mpls},
+            "ntp_serve": {"type": bool},
             "trunk_private_vlan_secondary": {"type": bool},
             "pvlan_mapping": {"type": str},
             "vlan_translations": {"type": VlanTranslations},
@@ -30456,6 +30555,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdModel."""
         mpls: Mpls
         """Subclass of AvdModel."""
+        ntp_serve: bool | None
+        """Enable/disable serving NTP to clients."""
         trunk_private_vlan_secondary: bool | None
         pvlan_mapping: str | None
         """List of vlans as string."""
@@ -30608,6 +30709,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 bfd: Bfd | UndefinedType = Undefined,
                 service_policy: ServicePolicy | UndefinedType = Undefined,
                 mpls: Mpls | UndefinedType = Undefined,
+                ntp_serve: bool | None | UndefinedType = Undefined,
                 trunk_private_vlan_secondary: bool | None | UndefinedType = Undefined,
                 pvlan_mapping: str | None | UndefinedType = Undefined,
                 vlan_translations: VlanTranslations | UndefinedType = Undefined,
@@ -30732,6 +30834,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     bfd: Subclass of AvdModel.
                     service_policy: Subclass of AvdModel.
                     mpls: Subclass of AvdModel.
+                    ntp_serve: Enable/disable serving NTP to clients.
                     trunk_private_vlan_secondary: trunk_private_vlan_secondary
                     pvlan_mapping: List of vlans as string.
                     vlan_translations: Subclass of AvdList with `VlanTranslationsItem` items.
@@ -62169,6 +62272,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "ipv6_attached_host_route_export": {"type": Ipv6AttachedHostRouteExport},
             "bfd": {"type": Bfd},
             "service_policy": {"type": ServicePolicy},
+            "ntp_serve": {"type": bool},
             "pvlan_mapping": {"type": str},
             "tenant": {"type": str},
             "tags": {"type": Tags},
@@ -62309,6 +62413,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdModel."""
         service_policy: ServicePolicy
         """Subclass of AvdModel."""
+        ntp_serve: bool | None
+        """Enable/disable serving NTP to clients."""
         pvlan_mapping: str | None
         """List of VLANs as string."""
         tenant: str | None
@@ -62391,6 +62497,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 ipv6_attached_host_route_export: Ipv6AttachedHostRouteExport | UndefinedType = Undefined,
                 bfd: Bfd | UndefinedType = Undefined,
                 service_policy: ServicePolicy | UndefinedType = Undefined,
+                ntp_serve: bool | None | UndefinedType = Undefined,
                 pvlan_mapping: str | None | UndefinedType = Undefined,
                 tenant: str | None | UndefinedType = Undefined,
                 tags: Tags | UndefinedType = Undefined,
@@ -62491,6 +62598,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     ipv6_attached_host_route_export: Subclass of AvdModel.
                     bfd: Subclass of AvdModel.
                     service_policy: Subclass of AvdModel.
+                    ntp_serve: Enable/disable serving NTP to clients.
                     pvlan_mapping: List of VLANs as string.
                     tenant: Key only used for documentation or validation purposes.
                     tags:

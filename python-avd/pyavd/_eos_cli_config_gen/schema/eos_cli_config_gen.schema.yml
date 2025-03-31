@@ -2880,6 +2880,9 @@ keys:
           keys:
             profile:
               type: str
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         tcp_mss_ceiling:
           type: dict
           description: 'The TCP MSS clamping feature involves clamping the maximum
@@ -9703,6 +9706,36 @@ keys:
         description: List of trusted-keys as string ex. 10-12,15.
         convert_types:
         - int
+      serve:
+        description: Enable Serving NTP to clients.
+        type: dict
+        keys:
+          serve_all:
+            type: bool
+          access_group:
+            type: str
+            description: Standard ACL to apply to NTP serve. All ACLs are applied
+              in the 'in' direction.
+          ipv6_access_group:
+            type: str
+            description: Standard IPv6 ACL to apply to NTP serve. All ACLs are applied
+              in the 'in' direction.
+          vrfs:
+            type: list
+            primary_key: name
+            items:
+              type: dict
+              keys:
+                name:
+                  type: str
+                  convert_types:
+                  - int
+                serve_all:
+                  type: bool
+                access_group:
+                  type: str
+                ipv6_access_group:
+                  type: str
   patch_panel:
     type: dict
     keys:
@@ -10805,6 +10838,9 @@ keys:
                   type: bool
                 igp_sync:
                   type: bool
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         trunk_private_vlan_secondary:
           type: bool
           deprecation:
@@ -23142,6 +23178,9 @@ keys:
                 input:
                   type: str
                   description: Name of policy-map used for policy based routing.
+        ntp_serve:
+          type: bool
+          description: Enable/disable serving NTP to clients.
         pvlan_mapping:
           type: str
           description: List of VLANs as string.
