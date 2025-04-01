@@ -911,6 +911,12 @@ ansible_collections/arista/avd/roles/eos_cli_config_gen/docs/tables/router-l2-vp
 ansible_collections/arista/avd/roles/eos_cli_config_gen/docs/tables/router-ospf.md
 --8<--
 
+### IPV6 Router OSPF
+
+--8<--
+ansible_collections/arista/avd/roles/eos_cli_config_gen/docs/tables/ipv6-router-ospf.md
+--8<--
+
 ### Router path selection
 
 --8<--
