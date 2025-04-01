@@ -4388,12 +4388,53 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                         """
 
-            _fields: ClassVar[dict] = {"service_type": {"type": bool}, "framed_mtu": {"type": int}, "lldp": {"type": Lldp}, "dhcp": {"type": Dhcp}}
+            class FilterId(AvdModel):
+                """Subclass of AvdModel."""
+
+                _fields: ClassVar[dict] = {"delimiter_period": {"type": bool}, "ipv4_ipv6_required": {"type": bool}, "multiple": {"type": bool}}
+                delimiter_period: bool | None
+                """Use period as the delimiter."""
+                ipv4_ipv6_required: bool | None
+                """Enable filters for IPv4 and IPv6 traffic."""
+                multiple: bool | None
+                """Multiple attribute."""
+
+                if TYPE_CHECKING:
+
+                    def __init__(
+                        self,
+                        *,
+                        delimiter_period: bool | None | UndefinedType = Undefined,
+                        ipv4_ipv6_required: bool | None | UndefinedType = Undefined,
+                        multiple: bool | None | UndefinedType = Undefined,
+                    ) -> None:
+                        """
+                        FilterId.
+
+
+                        Subclass of AvdModel.
+
+                        Args:
+                            delimiter_period: Use period as the delimiter.
+                            ipv4_ipv6_required: Enable filters for IPv4 and IPv6 traffic.
+                            multiple: Multiple attribute.
+
+                        """
+
+            _fields: ClassVar[dict] = {
+                "service_type": {"type": bool},
+                "framed_mtu": {"type": int},
+                "lldp": {"type": Lldp},
+                "dhcp": {"type": Dhcp},
+                "filter_id": {"type": FilterId},
+            }
             service_type: bool | None
             framed_mtu: int | None
             lldp: Lldp
             """Subclass of AvdModel."""
             dhcp: Dhcp
+            """Subclass of AvdModel."""
+            filter_id: FilterId
             """Subclass of AvdModel."""
 
             if TYPE_CHECKING:
@@ -4405,6 +4446,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     framed_mtu: int | None | UndefinedType = Undefined,
                     lldp: Lldp | UndefinedType = Undefined,
                     dhcp: Dhcp | UndefinedType = Undefined,
+                    filter_id: FilterId | UndefinedType = Undefined,
                 ) -> None:
                     """
                     RadiusAvPair.
@@ -4417,6 +4459,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                         framed_mtu: framed_mtu
                         lldp: Subclass of AvdModel.
                         dhcp: Subclass of AvdModel.
+                        filter_id: Subclass of AvdModel.
 
                     """
 
@@ -4852,22 +4895,56 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                     """
 
+        class VlanAssignmentGroupsItem(AvdModel):
+            """Subclass of AvdModel."""
+
+            _fields: ClassVar[dict] = {"name": {"type": str}, "members": {"type": str}}
+            name: str
+            members: str
+            """VLAN value(s) or range(s) of VLAN values."""
+
+            if TYPE_CHECKING:
+
+                def __init__(self, *, name: str | UndefinedType = Undefined, members: str | UndefinedType = Undefined) -> None:
+                    """
+                    VlanAssignmentGroupsItem.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        name: name
+                        members: VLAN value(s) or range(s) of VLAN values.
+
+                    """
+
+        class VlanAssignmentGroups(AvdIndexedList[str, VlanAssignmentGroupsItem]):
+            """Subclass of AvdIndexedList with `VlanAssignmentGroupsItem` items. Primary key is `name` (`str`)."""
+
+            _primary_key: ClassVar[str] = "name"
+
+        VlanAssignmentGroups._item_type = VlanAssignmentGroupsItem
+
         _fields: ClassVar[dict] = {
             "system_auth_control": {"type": bool},
             "protocol_lldp_bypass": {"type": bool},
             "protocol_bpdu_bypass": {"type": bool},
             "dynamic_authorization": {"type": bool},
+            "statistics_packets_dropped": {"type": bool},
             "mac_based_authentication": {"type": MacBasedAuthentication},
             "radius_av_pair_username_format": {"type": RadiusAvPairUsernameFormat},
             "radius_av_pair": {"type": RadiusAvPair},
             "aaa": {"type": Aaa},
             "captive_portal": {"type": CaptivePortal},
             "supplicant": {"type": Supplicant},
+            "vlan_assignment_groups": {"type": VlanAssignmentGroups},
         }
         system_auth_control: bool | None
         protocol_lldp_bypass: bool | None
         protocol_bpdu_bypass: bool | None
         dynamic_authorization: bool | None
+        statistics_packets_dropped: bool | None
+        """Enable the 802.1X port authentication dropped data packet statistics."""
         mac_based_authentication: MacBasedAuthentication
         """Subclass of AvdModel."""
         radius_av_pair_username_format: RadiusAvPairUsernameFormat
@@ -4893,6 +4970,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """
         supplicant: Supplicant
         """Subclass of AvdModel."""
+        vlan_assignment_groups: VlanAssignmentGroups
+        """Subclass of AvdIndexedList with `VlanAssignmentGroupsItem` items. Primary key is `name` (`str`)."""
 
         if TYPE_CHECKING:
 
@@ -4903,12 +4982,14 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 protocol_lldp_bypass: bool | None | UndefinedType = Undefined,
                 protocol_bpdu_bypass: bool | None | UndefinedType = Undefined,
                 dynamic_authorization: bool | None | UndefinedType = Undefined,
+                statistics_packets_dropped: bool | None | UndefinedType = Undefined,
                 mac_based_authentication: MacBasedAuthentication | UndefinedType = Undefined,
                 radius_av_pair_username_format: RadiusAvPairUsernameFormat | UndefinedType = Undefined,
                 radius_av_pair: RadiusAvPair | UndefinedType = Undefined,
                 aaa: Aaa | UndefinedType = Undefined,
                 captive_portal: CaptivePortal | UndefinedType = Undefined,
                 supplicant: Supplicant | UndefinedType = Undefined,
+                vlan_assignment_groups: VlanAssignmentGroups | UndefinedType = Undefined,
             ) -> None:
                 """
                 Dot1x.
@@ -4921,6 +5002,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     protocol_lldp_bypass: protocol_lldp_bypass
                     protocol_bpdu_bypass: protocol_bpdu_bypass
                     dynamic_authorization: dynamic_authorization
+                    statistics_packets_dropped: Enable the 802.1X port authentication dropped data packet statistics.
                     mac_based_authentication: Subclass of AvdModel.
                     radius_av_pair_username_format:
                        RADIUS AV-pair username settings.
@@ -4937,6 +5019,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                        Subclass of AvdModel.
                     supplicant: Subclass of AvdModel.
+                    vlan_assignment_groups: Subclass of AvdIndexedList with `VlanAssignmentGroupsItem` items. Primary key is `name` (`str`).
 
                 """
 
