@@ -15869,15 +15869,14 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
     class IpSshClientSourceInterfacesItem(AvdModel):
         """Subclass of AvdModel."""
 
-        _fields: ClassVar[dict] = {"name": {"type": str}, "vrf": {"type": str, "default": "default"}}
+        _fields: ClassVar[dict] = {"name": {"type": str}, "vrf": {"type": str}}
         name: str | None
         """Interface Name."""
-        vrf: str
-        """Default value: `"default"`"""
+        vrf: str | None
 
         if TYPE_CHECKING:
 
-            def __init__(self, *, name: str | None | UndefinedType = Undefined, vrf: str | UndefinedType = Undefined) -> None:
+            def __init__(self, *, name: str | None | UndefinedType = Undefined, vrf: str | None | UndefinedType = Undefined) -> None:
                 """
                 IpSshClientSourceInterfacesItem.
 
@@ -64342,6 +64341,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         "router_segment_security": {"type": RouterSegmentSecurity},
         "router_service_insertion": {"type": RouterServiceInsertion},
         "router_traffic_engineering": {"type": RouterTrafficEngineering},
+        "serial_number": {"type": str},
         "service_routing_configuration_bgp": {"type": ServiceRoutingConfigurationBgp},
         "service_routing_protocols_model": {"type": str},
         "service_unsupported_transceiver": {"type": ServiceUnsupportedTransceiver},
@@ -64849,6 +64849,12 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
     """
     router_traffic_engineering: RouterTrafficEngineering
     """Subclass of AvdModel."""
+    serial_number: str | None
+    """
+    Serial Number of the device.
+    Used only for documentation and deployment purposes. It is used by the
+    'eos_config_deploy_cvp' and 'cv_deploy' roles.
+    """
     service_routing_configuration_bgp: ServiceRoutingConfigurationBgp
     """Subclass of AvdModel."""
     service_routing_protocols_model: Literal["multi-agent", "ribd"] | None
@@ -65087,6 +65093,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             router_segment_security: RouterSegmentSecurity | UndefinedType = Undefined,
             router_service_insertion: RouterServiceInsertion | UndefinedType = Undefined,
             router_traffic_engineering: RouterTrafficEngineering | UndefinedType = Undefined,
+            serial_number: str | None | UndefinedType = Undefined,
             service_routing_configuration_bgp: ServiceRoutingConfigurationBgp | UndefinedType = Undefined,
             service_routing_protocols_model: Literal["multi-agent", "ribd"] | None | UndefinedType = Undefined,
             service_unsupported_transceiver: ServiceUnsupportedTransceiver | UndefinedType = Undefined,
@@ -65415,6 +65422,10 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                    Subclass of AvdModel.
                 router_traffic_engineering: Subclass of AvdModel.
+                serial_number:
+                   Serial Number of the device.
+                   Used only for documentation and deployment purposes. It is used by the
+                   'eos_config_deploy_cvp' and 'cv_deploy' roles.
                 service_routing_configuration_bgp: Subclass of AvdModel.
                 service_routing_protocols_model: service_routing_protocols_model
                 service_unsupported_transceiver: Subclass of AvdModel.

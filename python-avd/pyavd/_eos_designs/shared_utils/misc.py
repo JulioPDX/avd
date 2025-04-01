@@ -6,6 +6,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Protocol
 
+from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.schema import EosDesigns
 from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError, AristaAvdMissingVariableError
 from pyavd._utils import default, get
@@ -276,94 +277,147 @@ class MiscMixin(Protocol):
 
         return replacement_value
 
-    def get_l3_generic_interface_bgp_neighbors(
-        self: SharedUtilsProtocol,
-        l3_generic_interfaces: (
-            EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3Interfaces
-            | EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3PortChannels
-        ),
-    ) -> list:
-        """
-        Fetches bgp neighbors for given L3 interface placeholder.
+    def get_prefix_list(self: SharedUtilsProtocol, name: str) -> EosCliConfigGen.PrefixListsItem:
+        """Retrieve prefix list from self.inputs.ipv4_prefix_list_catalog."""
+        if name not in self.inputs.ipv4_prefix_list_catalog:
+            msg = f"ipv4_prefix_list_catalog[name={name}]"
+            raise AristaAvdMissingVariableError(msg)
+        return self.inputs.ipv4_prefix_list_catalog[name]._cast_as(EosCliConfigGen.PrefixListsItem)
 
-        Fetches bgp neighbors (list of dict) for all interfaces under given interface type.
-        'l3_generic_interfaces' is expected to be set to either property - self.l3_interfaces or self.l3_port_channels.
+    def get_l3_bgp_route_map_in(self: SharedUtilsProtocol, name: str, prefix_list_name: str, *, no_advertise: bool = False) -> EosCliConfigGen.RouteMapsItem:
         """
-        neighbors = []
-        is_l3_interface = False
-        if isinstance(l3_generic_interfaces, EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3Interfaces):
-            is_l3_interface = True
-            schema_key = "l3_interfaces"
+        Generate the inbound route-map for the Router BGP neighbors for node_config.l3_interfaces or node_config.l3_port_channels.
+
+        Args:
+            name: the route-map name RM-BGP-<PEER-IP>-IN
+            prefix_list_name: the prefix-list name to use for the sequence 10 permit match entry.
+            no_advertise: if True, set the community no-advertise on the sequence 10 entry.
+        """
+        route_map = EosCliConfigGen.RouteMapsItem(name=name)
+        sequence_number = EosCliConfigGen.RouteMapsItem.SequenceNumbersItem(
+            sequence=10, type="permit", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"ip address prefix-list {prefix_list_name}"])
+        )
+        # set no advertise is set only for WAN neighbors, which will also have prefix_list_in
+        if no_advertise:
+            sequence_number.set.append("community no-advertise additive")
+
+        route_map.sequence_numbers.append(sequence_number)
+        return route_map
+
+    def get_l3_bgp_route_map_out(self: SharedUtilsProtocol, name: str, prefix_list_name: str | None = None) -> EosCliConfigGen.RouteMapsItem:
+        """
+        Generate the outbound route-map for the Router BGP neighbors for node_config.l3_interfaces or node_config.l3_port_channels.
+
+        Args:
+            name: the route-map name RM-BGP-<PEER-IP>-OUT
+            prefix_list_name: the prefix-list name to use for the sequence 10 permit match entry,
+        """
+        route_map = EosCliConfigGen.RouteMapsItem(name=name)
+        if prefix_list_name:
+            route_map.sequence_numbers.append_new(
+                sequence=10, type="permit", match=EosCliConfigGen.RouteMapsItem.SequenceNumbersItem.Match([f"ip address prefix-list {prefix_list_name}"])
+            )
+            route_map.sequence_numbers.append_new(sequence=20, type="deny")
         else:
-            # implies we intend to query all L3 Port-Channels
+            route_map.sequence_numbers.append_new(
+                sequence=10,
+                type="deny",
+            )
+        return route_map
+
+    def update_l3_generic_interface_bgp_objects(
+        self: SharedUtilsProtocol,
+        interface: (
+            EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3InterfacesItem
+            | EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3PortChannelsItem
+        ),
+        neighbors: EosCliConfigGen.RouterBgp.Neighbors,
+        prefix_lists: EosCliConfigGen.PrefixLists,
+        route_maps: EosCliConfigGen.RouteMaps,
+    ) -> None:
+        if isinstance(interface, EosDesigns._DynamicKeys.DynamicNodeTypesItem.NodeTypes.NodesItem.L3InterfacesItem):
+            schema_key = "l3_interfaces"
+            description_function = self.interface_descriptions.underlay_ethernet_interface
+            peer_interface = interface.peer_interface
+        else:
             schema_key = "l3_port_channels"
+            description_function = self.interface_descriptions.underlay_port_channel_interface
+            peer_interface = interface.peer_port_channel
 
-        for interface in l3_generic_interfaces:
-            if not (interface.peer_ip and interface.bgp):
-                continue
+        context = f"{schema_key}[{interface.name}]"
 
-            if interface.bgp.peer_as is None:
-                msg = f"'{schema_key}[{interface.name}].bgp.peer_as' needs to be set to enable BGP."
-                raise AristaAvdInvalidInputsError(msg)
+        if not (interface.peer_ip and interface.bgp):
+            return
 
-            is_intf_wan = bool(interface.wan_carrier)
+        is_wan_interface = bool(interface.wan_carrier)
 
-            if not interface.bgp.ipv4_prefix_list_in and is_intf_wan:
-                msg = f"BGP is enabled but 'bgp.ipv4_prefix_list_in' is not configured for {schema_key}[{interface.name}]"
-                raise AristaAvdInvalidInputsError(msg)
+        if is_wan_interface and not interface.bgp.ipv4_prefix_list_in:
+            # TODO: Use source here when available.
+            msg = f"BGP is enabled but 'bgp.ipv4_prefix_list_in' is not configured for '{context}'."
+            raise AristaAvdInvalidInputsError(msg)
 
-            description = interface.description
-            if not description:
-                if is_l3_interface:
-                    description = self.interface_descriptions.underlay_ethernet_interface(
-                        InterfaceDescriptionData(
-                            shared_utils=self,
-                            interface=interface.name,
-                            peer=interface.peer,
-                            peer_interface=interface.peer_interface,
-                            wan_carrier=interface.wan_carrier,
-                            wan_circuit_id=interface.wan_circuit_id,
-                        ),
-                    )
-                else:
-                    # build description for L3 Port-Channel interface
-                    description = self.interface_descriptions.underlay_port_channel_interface(
-                        InterfaceDescriptionData(
-                            shared_utils=self,
-                            interface=interface.name,
-                            peer=interface.peer,
-                            peer_interface=interface.peer_port_channel,
-                            wan_carrier=interface.wan_carrier,
-                            wan_circuit_id=interface.wan_circuit_id,
-                        ),
-                    )
+        description = (
+            interface.description
+            or description_function(
+                InterfaceDescriptionData(
+                    shared_utils=self,
+                    interface=interface.name,
+                    peer=interface.peer,
+                    peer_interface=peer_interface,
+                    wan_carrier=interface.wan_carrier,
+                    wan_circuit_id=interface.wan_circuit_id,
+                ),
+            )
+            or None
+        )
 
-            neighbor = {
-                "ip_address": interface.peer_ip,
-                "remote_as": interface.bgp.peer_as,
-                "description": description,
-            }
+        neighbor = EosCliConfigGen.RouterBgp.NeighborsItem(
+            ip_address=interface.peer_ip,
+            remote_as=interface.bgp.peer_as,
+            description=description,
+        )
 
-            neighbor["ipv4_prefix_list_in"] = interface.bgp.ipv4_prefix_list_in
-            neighbor["ipv4_prefix_list_out"] = interface.bgp.ipv4_prefix_list_out
-            if is_intf_wan:
-                neighbor["set_no_advertise"] = True
+        if interface.bgp.ipv4_prefix_list_in:
+            if interface.bgp.ipv4_prefix_list_in not in prefix_lists:
+                prefix_lists.append(self.get_prefix_list(interface.bgp.ipv4_prefix_list_in))
+            rm_in_name = f"RM-BGP-{neighbor.ip_address}-IN"
+            neighbor.route_map_in = rm_in_name
+            route_maps.append(self.get_l3_bgp_route_map_in(rm_in_name, interface.bgp.ipv4_prefix_list_in, no_advertise=is_wan_interface))
 
-            # The inbound route-map is only used if there is a prefix list or no-advertise
-            if neighbor["ipv4_prefix_list_in"] or neighbor.get("set_no_advertise") is True:
-                neighbor["route_map_in"] = f"RM-BGP-{neighbor['ip_address']}-IN"
-            neighbor["route_map_out"] = f"RM-BGP-{neighbor['ip_address']}-OUT"
+        if interface.bgp.ipv4_prefix_list_out and interface.bgp.ipv4_prefix_list_out not in prefix_lists:
+            prefix_lists.append(self.get_prefix_list(interface.bgp.ipv4_prefix_list_out))
 
-            neighbors.append(neighbor)
+        rm_out_name = f"RM-BGP-{neighbor.ip_address}-OUT"
+        neighbor.route_map_out = rm_out_name
+        route_maps.append(self.get_l3_bgp_route_map_out(rm_out_name, interface.bgp.ipv4_prefix_list_out))
 
-        return neighbors
+        neighbors.append(neighbor)
 
     @cached_property
-    def l3_bgp_neighbors(self: SharedUtilsProtocol) -> list:
-        """Returns the consolidated list of L3 bgp neighbors referenced by L3 Interfaces and L3 Port-Channels."""
-        l3_bgp_neighbors = self.get_l3_generic_interface_bgp_neighbors(self.l3_interfaces)
-        l3_bgp_neighbors.extend(self.get_l3_generic_interface_bgp_neighbors(self.node_config.l3_port_channels))
-        return l3_bgp_neighbors
+    def l3_bgp_objects(self: SharedUtilsProtocol) -> tuple[EosCliConfigGen.RouterBgp.Neighbors, EosCliConfigGen.PrefixLists, EosCliConfigGen.RouteMaps]:
+        """Generates the EosCliConfigGen Router BGP Neighbors and their associated PrefixListsItem and RouteMapsItem."""
+        neighbors = EosCliConfigGen.RouterBgp.Neighbors()
+        prefix_lists = EosCliConfigGen.PrefixLists()
+        route_maps = EosCliConfigGen.RouteMaps()
+
+        for interface in self.l3_interfaces:
+            self.update_l3_generic_interface_bgp_objects(interface, neighbors, prefix_lists, route_maps)
+        for interface in self.node_config.l3_port_channels:
+            self.update_l3_generic_interface_bgp_objects(interface, neighbors, prefix_lists, route_maps)
+
+        return neighbors, prefix_lists, route_maps
+
+    @property
+    def l3_bgp_neighbors(self: SharedUtilsProtocol) -> EosCliConfigGen.RouterBgp.Neighbors:
+        return self.l3_bgp_objects[0]
+
+    @property
+    def l3_bgp_prefix_lists(self: SharedUtilsProtocol) -> EosCliConfigGen.PrefixLists:
+        return self.l3_bgp_objects[1]
+
+    @property
+    def l3_bgp_route_maps(self: SharedUtilsProtocol) -> EosCliConfigGen.RouteMaps:
+        return self.l3_bgp_objects[2]
 
     @cached_property
     def is_sfe_interface_profile_supported(self: SharedUtilsProtocol) -> bool:

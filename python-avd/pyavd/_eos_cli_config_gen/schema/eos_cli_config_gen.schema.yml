@@ -6274,7 +6274,6 @@ keys:
           type: str
         vrf:
           type: str
-          default: default
           convert_types:
           - int
   ip_tacacs_source_interfaces:
@@ -21328,6 +21327,16 @@ keys:
                 be less than the value of B) formats. Example. 30-34,55,RED
               convert_types:
               - int
+  serial_number:
+    documentation_options:
+      table: metadata
+    description: 'Serial Number of the device.
+
+      Used only for documentation and deployment purposes. It is used by the ''eos_config_deploy_cvp''
+      and ''cv_deploy'' roles.'
+    type: str
+    convert_types:
+    - int
   service_routing_configuration_bgp:
     type: dict
     keys:

@@ -6,15 +6,12 @@
 # Use Ctrl + Space to get suggestions for every field. Autocomplete will pop up after typing 2 letters.
 type: dict
 keys:
-  ip_ssh_client_source_interfaces:
-    type: list
-    items:
-      type: dict
-      keys:
-        name:
-          description: Interface Name.
-          type: str
-        vrf:
-          type: str
-          convert_types:
-            - int
+  serial_number:
+    documentation_options:
+      table: metadata
+    description: |-
+      Serial Number of the device.
+      Used only for documentation and deployment purposes. It is used by the 'eos_config_deploy_cvp' and 'cv_deploy' roles.
+    type: str
+    convert_types:
+      - int
