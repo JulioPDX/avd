@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from pyavd._eos_cli_config_gen.schema import EosCliConfigGen
 from pyavd._eos_designs.structured_config.structured_config_generator import structured_config_contributor
-from pyavd._errors import AristaAvdError
+from pyavd._errors import AristaAvdError, AristaAvdInvalidInputsError
 from pyavd._utils import get, get_ip_from_ip_prefix
 
 if TYPE_CHECKING:
@@ -120,8 +120,11 @@ class RouterPathSelectionMixin(Protocol):
         self.structured_config.router_path_selection.path_groups.append(path_group)
 
     def _wan_ha_peer_vtep_ip(self: AvdStructuredConfigOverlayProtocol) -> str:
-        peer_facts = self.shared_utils.get_peer_facts(self.shared_utils.wan_ha_peer, required=True)
-        return get(peer_facts, "vtep_ip", required=True)
+        peer_facts = self.shared_utils.get_peer_facts(self.shared_utils.wan_ha_peer)
+        if not peer_facts.vtep_ip:
+            msg = f"'vtep_ip' is required but was not found for host '{self.shared_utils.wan_ha_peer}'"
+            raise AristaAvdInvalidInputsError(msg)
+        return peer_facts.vtep_ip
 
     def _get_path_group_id(self: AvdStructuredConfigOverlayProtocol, path_group_name: str, config_id: int | None = None) -> int:
         """

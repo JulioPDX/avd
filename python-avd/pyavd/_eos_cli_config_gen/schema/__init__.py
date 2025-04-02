@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 class EosCliConfigGen(EosCliConfigGenRootModel):
-    """Subclass of AvdModel."""
+    """Subclass of EosCliConfigGenRootModel."""
 
     class AaaAccounting(AvdModel):
         """Subclass of AvdModel."""
@@ -65210,7 +65210,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             EosCliConfigGen.
 
 
-            Subclass of AvdModel.
+            Subclass of EosCliConfigGenRootModel.
 
             Args:
                 aaa_accounting: Subclass of AvdModel.
