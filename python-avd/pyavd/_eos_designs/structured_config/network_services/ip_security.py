@@ -25,6 +25,7 @@ class IpSecurityMixin(Protocol):
         if not self._filtered_internet_exit_policies_and_connections:
             return
 
+        is_ipsec_policy_in_use = False
         for internet_exit_policy, _ in self._filtered_internet_exit_policies_and_connections:
             # Currently we only need ipsec for zscaler.
             if internet_exit_policy.type != "zscaler":
@@ -36,6 +37,8 @@ class IpSecurityMixin(Protocol):
             sa_policy_name = f"IE-{policy_name}-SA-POLICY"
             profile_name = f"IE-{policy_name}-PROFILE"
             ufqdn, ipsec_key = self._get_ipsec_credentials(internet_exit_policy)
+            if ipsec_key:
+                is_ipsec_policy_in_use = True
 
             self.structured_config.ip_security.ike_policies.append_new(
                 name=ike_policy_name,
@@ -62,3 +65,6 @@ class IpSecurityMixin(Protocol):
                 ),
                 connection="start",
             )
+
+        if is_ipsec_policy_in_use and self.inputs.ipsec_settings.bind_connection_to_interface:
+            self.structured_config.ip_security.connection_tx_interface_match_source_ip = True

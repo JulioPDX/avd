@@ -4344,6 +4344,36 @@ class EosDesigns(EosDesignsRootModel):
 
                 """
 
+    class IpsecSettings(AvdModel):
+        """Subclass of AvdModel."""
+
+        _fields: ClassVar[dict] = {"bind_connection_to_interface": {"type": bool, "default": False}}
+        bind_connection_to_interface: bool
+        """
+        Allow IPsec connections to be bound to the source interface.
+        Enabling this prevents IPsec
+        connections from using ECMP paths.
+
+        Default value: `False`
+        """
+
+        if TYPE_CHECKING:
+
+            def __init__(self, *, bind_connection_to_interface: bool | UndefinedType = Undefined) -> None:
+                """
+                IpsecSettings.
+
+
+                Subclass of AvdModel.
+
+                Args:
+                    bind_connection_to_interface:
+                       Allow IPsec connections to be bound to the source interface.
+                       Enabling this prevents IPsec
+                       connections from using ECMP paths.
+
+                """
+
     class Ipv4AclsItem(AvdModel):
         """Subclass of AvdModel."""
 
@@ -56770,6 +56800,7 @@ class EosDesigns(EosDesignsRootModel):
             "type": InternalVlanOrder,
             "default": lambda cls: coerce_type({"allocation": "ascending", "range": {"beginning": 1006, "ending": 1199}}, target_type=cls),
         },
+        "ipsec_settings": {"type": IpsecSettings},
         "ipv4_acls": {"type": Ipv4Acls},
         "ipv4_prefix_list_catalog": {"type": Ipv4PrefixListCatalog},
         "ipv6_mgmt_destination_networks": {"type": Ipv6MgmtDestinationNetworks},
@@ -57765,6 +57796,12 @@ class EosDesigns(EosDesignsRootModel):
     Subclass of AvdModel.
 
     Default value: `lambda cls: coerce_type({"allocation": "ascending", "range": {"beginning": 1006, "ending": 1199}}, target_type=cls)`
+    """
+    ipsec_settings: IpsecSettings
+    """
+    Settings applicable to all IPsec connections.
+
+    Subclass of AvdModel.
     """
     ipv4_acls: Ipv4Acls
     """
@@ -58924,6 +58961,7 @@ class EosDesigns(EosDesignsRootModel):
             hardware_counters: EosCliConfigGen.HardwareCounters | UndefinedType = Undefined,
             inband_ztp_bootstrap_file: str | None | UndefinedType = Undefined,
             internal_vlan_order: InternalVlanOrder | UndefinedType = Undefined,
+            ipsec_settings: IpsecSettings | UndefinedType = Undefined,
             ipv4_acls: Ipv4Acls | UndefinedType = Undefined,
             ipv4_prefix_list_catalog: Ipv4PrefixListCatalog | UndefinedType = Undefined,
             ipv6_mgmt_destination_networks: Ipv6MgmtDestinationNetworks | UndefinedType = Undefined,
@@ -59576,6 +59614,10 @@ class EosDesigns(EosDesignsRootModel):
                    no value will be configured.
                 internal_vlan_order:
                    Internal vlan allocation order and range.
+
+                   Subclass of AvdModel.
+                ipsec_settings:
+                   Settings applicable to all IPsec connections.
 
                    Subclass of AvdModel.
                 ipv4_acls:

@@ -1933,6 +1933,18 @@ keys:
       range:
         beginning: 1006
         ending: 1199
+  ipsec_settings:
+    documentation_options:
+      table: wan-settings
+    description: Settings applicable to all IPsec connections.
+    type: dict
+    keys:
+      bind_connection_to_interface:
+        type: bool
+        default: false
+        description: 'Allow IPsec connections to be bound to the source interface.
+
+          Enabling this prevents IPsec connections from using ECMP paths.'
   ipv4_acls:
     type: list
     primary_key: name

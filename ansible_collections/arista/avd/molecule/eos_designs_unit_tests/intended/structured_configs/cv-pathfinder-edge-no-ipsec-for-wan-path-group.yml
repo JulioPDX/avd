@@ -10,16 +10,13 @@ application_traffic_recognition:
     ipv4_prefixes:
     - name: PFX-PATHFINDERS
       prefix_values:
-      - 192.168.144.1/32
+      - 10.10.10.10/32
   applications:
     ipv4_applications:
     - name: APP-CONTROL-PLANE
       dest_prefix_set_name: PFX-PATHFINDERS
   application_profiles:
-  - name: VIDEO
-    applications:
-    - name: CUSTOM-APPLICATION-1
-    - name: skype
+  - name: TEST
   - name: APP-PROFILE-CONTROL-PLANE
     applications:
     - name: APP-CONTROL-PLANE
@@ -30,57 +27,76 @@ dps_interfaces:
   mtu: 9194
   ip_address: 192.168.255.1/32
   flow_tracker:
-    hardware: custom_flow_track_name
+    hardware: FLOW-TRACKER
 enable_password:
   disabled: true
 ethernet_interfaces:
-- name: Ethernet1
+- name: Ethernet1/1
   description: ATT_666
   shutdown: false
-  ip_address: dhcp
-  dhcp_client_accept_default_route: true
+  ip_address: 192.168.1.105/31
   peer_type: l3_interface
   switchport:
     enabled: false
-- name: Ethernet2
-  description: Colt_10555
+- name: Ethernet1/2
+  description: ATT_777
   shutdown: false
-  ip_address: 172.15.5.5/31
-  peer_type: l3_interface
-  switchport:
-    enabled: false
-- name: Ethernet3
-  description: Comcast-5G_AF830
-  shutdown: false
-  ip_address: 172.20.20.20/31
+  ip_address: 192.168.2.205/31
   peer_type: l3_interface
   switchport:
     enabled: false
 flow_tracking:
   hardware:
     trackers:
-    - name: custom_flow_track_name
+    - name: FLOW-TRACKER
       record_export:
-        on_inactive_timeout: 50000
-        on_interval: 300331
+        on_inactive_timeout: 70000
+        on_interval: 300000
       exporters:
-      - name: ayush_exporter
+      - name: CV-TELEMETRY
         collector:
           host: 127.0.0.1
         local_interface: Loopback0
-        template_interval: 40000
+        template_interval: 3600000
     shutdown: false
-hostname: cv-pathfinder-edge-custom-default-policy
+hostname: cv-pathfinder-edge-no-ipsec-for-wan-path-group
+ip_access_lists:
+- name: ACL-NAT-IE-ZSCALER
+  entries:
+  - sequence: 10
+    action: permit
+    protocol: ip
+    source: any
+    destination: any
 ip_extcommunity_lists:
 - name: ECL-EVPN-SOO
   entries:
   - type: permit
-    extcommunities: soo 192.168.42.1:1
+    extcommunities: soo 192.168.42.1:136
+ip_nat:
+  profiles:
+  - name: NAT-IE-ZSCALER
+    source:
+      dynamic:
+      - access_list: ACL-NAT-IE-ZSCALER
+        nat_type: pool
+        pool_name: PORT-ONLY-POOL
+  pools:
+  - name: PORT-ONLY-POOL
+    type: port-only
+    ranges:
+    - first_port: 1500
+      last_port: 65535
 ip_routing: true
 ip_security:
   ike_policies:
   - name: CP-IKE-POLICY
     local_id: 192.168.255.1
+  - name: IE-ZSCALER-EXIT-POLICY-1-IKE-POLICY
+    local_id_fqdn: cv-pathfinder-edge-no-ipsec-for-wan-path-group_ZSCALER-EXIT-POLICY-1@test.local
+    ike_lifetime: 24
+    encryption: aes256
+    dh_group: 24
   sa_policies:
   - name: DP-SA-POLICY
     esp:
@@ -90,6 +106,13 @@ ip_security:
     esp:
       encryption: aes256gcm128
     pfs_dh_group: 14
+  - name: IE-ZSCALER-EXIT-POLICY-1-SA-POLICY
+    sa_lifetime:
+      value: 8
+    esp:
+      integrity: sha256
+      encryption: aes256
+    pfs_dh_group: 24
   profiles:
   - name: DP-PROFILE
     sa_policy: DP-SA-POLICY
@@ -110,6 +133,15 @@ ip_security:
       time: 50
       action: clear
     mode: transport
+  - name: IE-ZSCALER-EXIT-POLICY-1-PROFILE
+    ike_policy: IE-ZSCALER-EXIT-POLICY-1-IKE-POLICY
+    sa_policy: IE-ZSCALER-EXIT-POLICY-1-SA-POLICY
+    connection: start
+    shared_key: 0007054B145A1F0E0928424A0C0B4812160C094924246921232627104A100C131B4E595D191E020C1E145F455C47456B316825267472365E233C723F4B3F0E60672A2048462D3F242D191417001C000E373834263E60786D7F602B27
+    dpd:
+      interval: 10
+      time: 60
+      action: clear
   key_controller:
     profile: DP-PROFILE
   connection_tx_interface_match_source_ip: true
@@ -140,13 +172,13 @@ metadata:
     - name: Role
       value: edge
     - name: Region
-      value: AVD_Land_West
+      value: AVD_Land_West_1
     - name: Zone
-      value: AVD_Land_West-ZONE
+      value: AVD_Land_West_1-ZONE
     - name: Site
-      value: Site1
+      value: Site136
     interface_tags:
-    - interface: Ethernet1
+    - interface: Ethernet1/1
       tags:
       - name: Type
         value: wan
@@ -154,44 +186,67 @@ metadata:
         value: ATT
       - name: Circuit
         value: '666'
-    - interface: Ethernet2
+    - interface: Ethernet1/2
       tags:
       - name: Type
         value: wan
       - name: Carrier
-        value: Colt
+        value: ATT
       - name: Circuit
-        value: '10555'
-    - interface: Ethernet3
-      tags:
-      - name: Type
-        value: wan
-      - name: Carrier
-        value: Comcast-5G
-      - name: Circuit
-        value: AF830
+        value: '777'
   cv_pathfinder:
     role: edge
-    region: AVD_Land_West
-    zone: AVD_Land_West-ZONE
-    site: Site1
+    region: AVD_Land_West_1
+    zone: AVD_Land_West_1-ZONE
+    site: Site136
     vtep_ip: 192.168.255.1
     ssl_profile: STUN-DTLS
     pathfinders:
-    - vtep_ip: 192.168.144.1
+    - vtep_ip: 10.10.10.10
     interfaces:
-    - name: Ethernet1
+    - name: Ethernet1/1
       carrier: ATT
       circuit_id: '666'
       pathgroup: INET
-    - name: Ethernet2
-      carrier: Colt
-      circuit_id: '10555'
-      pathgroup: MPLS
-    - name: Ethernet3
-      carrier: Comcast-5G
-      circuit_id: AF830
-      pathgroup: LTE
+    - name: Ethernet1/2
+      carrier: ATT
+      circuit_id: '777'
+      pathgroup: INET
+    internet_exit_policies:
+    - name: ZSCALER-EXIT-POLICY-1
+      type: zscaler
+      city: Santa Clara, CA
+      country: United States
+      firewall: false
+      ips_control: false
+      acceptable_use_policy: false
+      vpn_credentials:
+      - fqdn: cv-pathfinder-edge-no-ipsec-for-wan-path-group_ZSCALER-EXIT-POLICY-1@test.local
+        vpn_type: UFQDN
+        pre_shared_key: 0007054B145A1F0E0928424A0C0B4812160C094924246921232627104A100C131B4E595D191E020C1E145F455C47456B316825267472365E233C723F4B3F0E60672A2048462D3F242D191417001C000E373834263E60786D7F602B27
+      tunnels:
+      - name: Tunnel100
+        preference: Preferred
+        endpoint:
+          ip_address: 192.168.121.108
+          datacenter: FMT1
+          city: Fremont, CA
+          country: United States
+          region: us-west1
+          latitude: '37'
+          longitude: '-121'
+monitor_connectivity:
+  shutdown: false
+  interface_sets:
+  - name: SET-Tunnel100
+    interfaces: Tunnel100
+  hosts:
+  - name: IE-Tunnel100
+    description: Internet Exit ZSCALER-EXIT-POLICY-1 PRI
+    ip: 192.168.121.108
+    local_interfaces: SET-Tunnel100
+    address_only: false
+    url: http://gateway.zscalerbeta.net/vpntest
 prefix_lists:
 - name: PL-LOOPBACKS-EVPN-OVERLAY
   sequence_numbers:
@@ -205,7 +260,7 @@ route_maps:
     match:
     - ip address prefix-list PL-LOOPBACKS-EVPN-OVERLAY
     set:
-    - extcommunity soo 192.168.42.1:1 additive
+    - extcommunity soo 192.168.42.1:136 additive
 - name: RM-EVPN-SOO-IN
   sequence_numbers:
   - sequence: 10
@@ -219,7 +274,7 @@ route_maps:
   - sequence: 10
     type: permit
     set:
-    - extcommunity soo 192.168.42.1:1 additive
+    - extcommunity soo 192.168.42.1:136 additive
 - name: RM-EVPN-EXPORT-VRF-DEFAULT
   sequence_numbers:
   - sequence: 10
@@ -229,53 +284,44 @@ route_maps:
 router_adaptive_virtual_topology:
   topology_role: edge
   region:
-    name: AVD_Land_West
-    id: 42
+    name: AVD_Land_West_1
+    id: 36
   zone:
-    name: AVD_Land_West-ZONE
+    name: AVD_Land_West_1-ZONE
     id: 1
   site:
-    name: Site1
-    id: 1
+    name: Site136
+    id: 136
   profiles:
+  - name: DEFAULT-POLICY-TEST
+    load_balance_policy: LB-DEFAULT-POLICY-TEST
+    internet_exit_policy: ZSCALER-EXIT-POLICY-1
   - name: DEFAULT-POLICY-CONTROL-PLANE
     load_balance_policy: LB-DEFAULT-POLICY-CONTROL-PLANE
-  - name: DEFAULT-POLICY-VIDEO
-    load_balance_policy: LB-DEFAULT-POLICY-VIDEO
-  - name: DEFAULT-POLICY-DEFAULT
-    load_balance_policy: LB-DEFAULT-POLICY-DEFAULT
   policies:
+  - name: DEFAULT-POLICY
+    matches:
+    - application_profile: TEST
+      avt_profile: DEFAULT-POLICY-TEST
   - name: DEFAULT-POLICY-WITH-CP
     matches:
     - application_profile: APP-PROFILE-CONTROL-PLANE
       avt_profile: DEFAULT-POLICY-CONTROL-PLANE
-    - application_profile: VIDEO
-      avt_profile: DEFAULT-POLICY-VIDEO
-    - application_profile: default
-      avt_profile: DEFAULT-POLICY-DEFAULT
-  - name: DEFAULT-POLICY
-    matches:
-    - application_profile: VIDEO
-      avt_profile: DEFAULT-POLICY-VIDEO
-    - application_profile: default
-      avt_profile: DEFAULT-POLICY-DEFAULT
+    - application_profile: TEST
+      avt_profile: DEFAULT-POLICY-TEST
   vrfs:
+  - name: PROD
+    policy: DEFAULT-POLICY
+    profiles:
+    - name: DEFAULT-POLICY-TEST
+      id: 42
   - name: default
     policy: DEFAULT-POLICY-WITH-CP
     profiles:
     - name: DEFAULT-POLICY-CONTROL-PLANE
       id: 254
-    - name: DEFAULT-POLICY-VIDEO
-      id: 3
-    - name: DEFAULT-POLICY-DEFAULT
-      id: 1
-  - name: PROD
-    policy: DEFAULT-POLICY
-    profiles:
-    - name: DEFAULT-POLICY-VIDEO
-      id: 3
-    - name: DEFAULT-POLICY-DEFAULT
-      id: 1
+    - name: DEFAULT-POLICY-TEST
+      id: 42
 router_bfd:
   multihop:
     interval: 300
@@ -304,9 +350,9 @@ router_bgp:
     password: htm4AZe9mIQOO1uiMuGgYQ==
     send_community: all
     maximum_routes: 0
-    ttl_maximum_hops: 42
+    ttl_maximum_hops: 1
   neighbors:
-  - ip_address: 192.168.144.1
+  - ip_address: 10.10.10.10
     peer_group: WAN-OVERLAY-PEERS
     peer: cv-pathfinder-pathfinder
     description: cv-pathfinder-pathfinder_Dps1
@@ -372,80 +418,79 @@ router_bgp:
     redistribute:
       connected:
         enabled: true
+router_internet_exit:
+  policies:
+  - name: ZSCALER-EXIT-POLICY-1
+    exit_groups:
+    - name: ZSCALER-EXIT-POLICY-1_PRI
+    - name: system-default-exit-group
+  exit_groups:
+  - name: ZSCALER-EXIT-POLICY-1_PRI
+    local_connections:
+    - name: IE-Tunnel100
 router_path_selection:
   path_groups:
   - name: INET
     id: 101
-    ipsec_profile: CP-PROFILE
     local_interfaces:
-    - name: Ethernet1
+    - name: Ethernet1/1
       stun:
         server_profiles:
-        - INET-cv-pathfinder-pathfinder-Ethernet1
-        - INET-cv-pathfinder-pathfinder-Ethernet3
-    dynamic_peers:
-      enabled: true
-    static_peers:
-    - router_ip: 192.168.144.1
-      name: cv-pathfinder-pathfinder
-      ipv4_addresses:
-      - 172.17.7.7
-      - 10.9.9.9
-  - name: MPLS
-    id: 100
-    local_interfaces:
-    - name: Ethernet2
+        - INET-cv-pathfinder-pathfinder-Ethernet1_1
+    - name: Ethernet1/2
       stun:
         server_profiles:
-        - MPLS-cv-pathfinder-pathfinder-Ethernet2_2
+        - INET-cv-pathfinder-pathfinder-Ethernet1_1
     dynamic_peers:
       enabled: true
+      ipsec: false
     static_peers:
-    - router_ip: 192.168.144.1
+    - router_ip: 10.10.10.10
       name: cv-pathfinder-pathfinder
       ipv4_addresses:
-      - 172.16.0.1
-  - name: LTE
-    id: 102
-    ipsec_profile: CP-PROFILE
-    local_interfaces:
-    - name: Ethernet3
-    dynamic_peers:
-      enabled: true
+      - 192.168.55.55
   load_balance_policies:
+  - name: LB-DEFAULT-POLICY-TEST
+    path_groups:
+    - name: INET
   - name: LB-DEFAULT-POLICY-CONTROL-PLANE
     path_groups:
     - name: INET
-    - name: MPLS
-  - name: LB-DEFAULT-POLICY-VIDEO
-    path_groups:
-    - name: MPLS
-    - name: INET
-  - name: LB-DEFAULT-POLICY-DEFAULT
-    path_groups:
-    - name: INET
-    - name: LTE
-      priority: 42
   tcp_mss_ceiling:
     ipv4_segment_size: auto
+router_service_insertion:
+  enabled: true
+  connections:
+  - name: IE-Tunnel100
+    tunnel_interface:
+      primary: Tunnel100
+    monitor_connectivity_host: IE-Tunnel100
 router_traffic_engineering:
   enabled: true
 service_routing_protocols_model: multi-agent
 spanning_tree:
   mode: none
+static_routes:
+- destination_address_prefix: 192.168.121.108/32
+  gateway: 192.168.1.104
+  name: IE-ZSCALER-PRI
 stun:
   client:
     server_profiles:
-    - name: INET-cv-pathfinder-pathfinder-Ethernet1
-      ip_address: 172.17.7.7
-      ssl_profile: STUN-DTLS
-    - name: INET-cv-pathfinder-pathfinder-Ethernet3
-      ip_address: 10.9.9.9
-      ssl_profile: STUN-DTLS
-    - name: MPLS-cv-pathfinder-pathfinder-Ethernet2_2
-      ip_address: 172.16.0.1
+    - name: INET-cv-pathfinder-pathfinder-Ethernet1_1
+      ip_address: 192.168.55.55
       ssl_profile: STUN-DTLS
 transceiver_qsfp_default_mode_4x10: false
+tunnel_interfaces:
+- name: Tunnel100
+  description: Internet Exit ZSCALER-EXIT-POLICY-1 PRI
+  mtu: 1394
+  ip_address: unnumbered Loopback0
+  tunnel_mode: ipsec
+  source_interface: Ethernet1/1
+  destination: 192.168.121.108
+  ipsec_profile: IE-ZSCALER-EXIT-POLICY-1-PROFILE
+  nat_profile: NAT-IE-ZSCALER
 vrfs:
 - name: MGMT
   ip_routing: false
@@ -454,7 +499,7 @@ vrfs:
   tenant: TenantA
 vxlan_interface:
   vxlan1:
-    description: cv-pathfinder-edge-custom-default-policy_VTEP
+    description: cv-pathfinder-edge-no-ipsec-for-wan-path-group_VTEP
     vxlan:
       source_interface: Dps1
       udp_port: 4789
