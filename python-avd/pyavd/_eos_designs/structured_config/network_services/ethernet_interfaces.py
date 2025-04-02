@@ -139,9 +139,7 @@ class EthernetInterfacesMixin(Protocol):
                     shutdown=not l3_interface.enabled,
                     description=interface_description,
                     eos_cli=l3_interface.raw_eos_cli,
-                    flow_tracker=self.shared_utils.new_get_flow_tracker(
-                        l3_interface.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker
-                    ),
+                    flow_tracker=self.shared_utils.get_flow_tracker(l3_interface.flow_tracking, output_type=EosCliConfigGen.EthernetInterfacesItem.FlowTracker),
                 )
 
                 if l3_interface.structured_config:
