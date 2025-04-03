@@ -109,7 +109,8 @@ def _parse_requirements(req_str: str) -> tuple[Requirement, list[str]]:
 
 
 def _check_requirement(req: Requirement, requirements_dict: dict[str, Any]) -> bool:
-    """Check one requirement and in-place update requirement_dict.
+    """
+    Check one requirement and in-place update requirement_dict.
 
     Returns:
         boolean: True if the check succeeds, False otherwise
