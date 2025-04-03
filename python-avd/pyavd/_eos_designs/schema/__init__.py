@@ -6510,7 +6510,18 @@ class EosDesigns(EosDesignsRootModel):
     class ManagementEapi(AvdModel):
         """Subclass of AvdModel."""
 
-        _fields: ClassVar[dict] = {"enable_http": {"type": bool}, "enable_https": {"type": bool, "default": True}, "default_services": {"type": bool}}
+        _fields: ClassVar[dict] = {
+            "enabled": {"type": bool, "default": True},
+            "enable_http": {"type": bool},
+            "enable_https": {"type": bool, "default": True},
+            "default_services": {"type": bool},
+        }
+        enabled: bool
+        """
+        Enable/Disable api http-commands.
+
+        Default value: `True`
+        """
         enable_http: bool | None
         enable_https: bool
         """Default value: `True`"""
@@ -6521,6 +6532,7 @@ class EosDesigns(EosDesignsRootModel):
             def __init__(
                 self,
                 *,
+                enabled: bool | UndefinedType = Undefined,
                 enable_http: bool | None | UndefinedType = Undefined,
                 enable_https: bool | UndefinedType = Undefined,
                 default_services: bool | None | UndefinedType = Undefined,
@@ -6532,6 +6544,7 @@ class EosDesigns(EosDesignsRootModel):
                 Subclass of AvdModel.
 
                 Args:
+                    enabled: Enable/Disable api http-commands.
                     enable_http: enable_http
                     enable_https: enable_https
                     default_services: default_services
