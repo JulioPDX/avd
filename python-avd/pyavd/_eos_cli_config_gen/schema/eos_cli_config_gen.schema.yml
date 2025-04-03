@@ -8829,6 +8829,7 @@ keys:
         - str
       interface_sets:
         type: list
+        primary_key: name
         items:
           type: dict
           keys:
@@ -8904,6 +8905,7 @@ keys:
               type: str
             interface_sets:
               type: list
+              primary_key: name
               items:
                 type: dict
                 keys:

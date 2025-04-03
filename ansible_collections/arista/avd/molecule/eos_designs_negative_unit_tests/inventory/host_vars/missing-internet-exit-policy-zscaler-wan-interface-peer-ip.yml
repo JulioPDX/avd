@@ -1,9 +1,8 @@
 ---
+# Testing missing interface peer IP for Zscaler internet exit policy
 wan_mode: cv-pathfinder
 # Disabling underlay for tests
 underlay_routing_protocol: none
-
-type: wan_router
 
 bgp_as: 65000
 
@@ -37,6 +36,11 @@ wan_ipsec_profiles:
   data_plane:
     shared_key: ABCDEF1234567890666
 
+default_node_types:
+  - node_type: wan_router
+    match_hostnames:
+      - "missing-internet-exit-policy.*"
+
 wan_router:
   defaults:
     loopback_ipv4_pool: 192.168.42.0/24
@@ -44,7 +48,7 @@ wan_router:
     filter:
       always_include_vrfs_in_tenants: [TenantA]
   nodes:
-    - name: duplicate-tunnel-interface-internet-exit
+    - name: missing-internet-exit-policy-zscaler-wan-interface-peer-ip
       cv_pathfinder_region: AVD_Land_West
       cv_pathfinder_site: Site422
       id: 1
@@ -54,21 +58,10 @@ wan_router:
           wan_circuit_id: 666
           dhcp_accept_default_route: true
           ip_address: dhcp
-          peer_ip: 10.254.254.1
+          # missing peer-ip for zscaler Internet Exit policy
           cv_pathfinder_internet_exit:
             policies:
               - name: ZSCALER-EXIT-POLICY-1
-                tunnel_interface_numbers: 100-102
-        - name: Ethernet2
-          wan_carrier: ATT
-          wan_circuit_id: 777
-          dhcp_accept_default_route: true
-          ip_address: dhcp
-          peer_ip: 10.254.254.5
-          cv_pathfinder_internet_exit:
-            policies:
-              - name: ZSCALER-EXIT-POLICY-2
-                # Clashing IDs with Ethernet1
                 tunnel_interface_numbers: 100-102
 
 wan_path_groups:
@@ -98,22 +91,15 @@ wan_virtual_topologies:
         drop_unmatched: true
       application_virtual_topologies:
         - application_profile: TEST
+          id: 42
           path_groups:
             - names: [INET]
           internet_exit:
             policy: ZSCALER-EXIT-POLICY-1
-          id: 42
-        - application_profile: TEST2
-          path_groups:
-            - names: [INET]
-          internet_exit:
-            policy: ZSCALER-EXIT-POLICY-2
-          id: 43
 
 application_classification:
   application_profiles:
     - name: TEST
-    - name: TEST2
 
 cv_pathfinder_internet_exit_policies:
   - name: ZSCALER-EXIT-POLICY-1
@@ -121,35 +107,6 @@ cv_pathfinder_internet_exit_policies:
     zscaler:
       domain_name: test.local
       ipsec_key_salt: THIS_SHOULD_BE_VAULTED
-  - name: ZSCALER-EXIT-POLICY-2
-    fallback_to_system_default: false
-    type: zscaler
-    zscaler:
-      domain_name: test.local
-      ipsec_key_salt: THIS_SHOULD_BE_VAULTED
-
-zscaler_endpoints:
-  cloud_name: zscalerbeta
-  device_location:
-    city: Santa Clara, CA
-    country: United States
-  primary:
-    city: Fremont, CA
-    datacenter: FMT1
-    country: United States
-    region: us-west1
-    latitude: 37
-    longitude: -121
-    ip_address: 10.37.121.1 # Not the correct address
 
 expected_error_message: >-
-  Found duplicate objects with conflicting data while generating configuration for TunnelInterfaces.
-  {'name': 'Tunnel100', 'description': 'Internet Exit ZSCALER-EXIT-POLICY-2 PRI', 'mtu': 1394,
-  'ip_address': 'unnumbered Loopback0', 'tunnel_mode': 'ipsec', 'source_interface': 'Ethernet2',
-  'destination': '10.37.121.1', 'ipsec_profile': 'IE-ZSCALER-EXIT-POLICY-2-PROFILE',
-  'nat_profile': 'NAT-IE-ZSCALER'}
-  conflicts with
-  {'name': 'Tunnel100', 'description': 'Internet Exit ZSCALER-EXIT-POLICY-1 PRI', 'mtu': 1394,
-  'ip_address': 'unnumbered Loopback0', 'tunnel_mode': 'ipsec', 'source_interface': 'Ethernet1',
-  'destination': '10.37.121.1', 'ipsec_profile': 'IE-ZSCALER-EXIT-POLICY-1-PROFILE',
-  'nat_profile': 'NAT-IE-ZSCALER'}.
+  The configured internet-exit policy requires `peer_ip` configured under the WAN Interface Ethernet1.
