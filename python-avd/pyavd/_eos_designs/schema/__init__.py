@@ -35223,6 +35223,7 @@ class EosDesigns(EosDesignsRootModel):
                             "loopback_ip_range": {"type": str},
                             "loopback_ipv6_range": {"type": str},
                             "loopback_ip_pools": {"type": LoopbackIpPools},
+                            "hardware_forwarding": {"type": bool},
                         }
                         loopback: int | None
                         """Loopback interface number, required when vtep_diagnotics defined."""
@@ -35269,6 +35270,11 @@ class EosDesigns(EosDesignsRootModel):
 
                         Subclass of AvdIndexedList with `LoopbackIpPoolsItem` items. Primary key is `pod` (`str`).
                         """
+                        hardware_forwarding: bool | None
+                        """
+                        Enable hardware forwarding for diagnostic loopbacks. This is required for correct forwarding in VRFs
+                        without physical interfaces.
+                        """
 
                         if TYPE_CHECKING:
 
@@ -35280,6 +35286,7 @@ class EosDesigns(EosDesignsRootModel):
                                 loopback_ip_range: str | None | UndefinedType = Undefined,
                                 loopback_ipv6_range: str | None | UndefinedType = Undefined,
                                 loopback_ip_pools: LoopbackIpPools | UndefinedType = Undefined,
+                                hardware_forwarding: bool | None | UndefinedType = Undefined,
                             ) -> None:
                                 """
                                 VtepDiagnostic.
@@ -35324,6 +35331,9 @@ class EosDesigns(EosDesignsRootModel):
 
 
                                        Subclass of AvdIndexedList with `LoopbackIpPoolsItem` items. Primary key is `pod` (`str`).
+                                    hardware_forwarding:
+                                       Enable hardware forwarding for diagnostic loopbacks. This is required for correct forwarding in VRFs
+                                       without physical interfaces.
 
                                 """
 
@@ -37873,6 +37883,7 @@ class EosDesigns(EosDesignsRootModel):
                             "description": {"type": str},
                             "enabled": {"type": bool, "default": True},
                             "ospf": {"type": Ospf},
+                            "hardware_forwarding": {"type": bool},
                             "raw_eos_cli": {"type": str},
                         }
                         node: str
@@ -37886,6 +37897,11 @@ class EosDesigns(EosDesignsRootModel):
                         OSPF interface configuration.
 
                         Subclass of AvdModel.
+                        """
+                        hardware_forwarding: bool | None
+                        """
+                        Enable hardware forwarding for this loopback. This is required for correct forwarding in VRFs
+                        without physical interfaces.
                         """
                         raw_eos_cli: str | None
                         """EOS CLI rendered directly on the Loopback interface in the final EOS configuration."""
@@ -37901,6 +37917,7 @@ class EosDesigns(EosDesignsRootModel):
                                 description: str | None | UndefinedType = Undefined,
                                 enabled: bool | UndefinedType = Undefined,
                                 ospf: Ospf | UndefinedType = Undefined,
+                                hardware_forwarding: bool | None | UndefinedType = Undefined,
                                 raw_eos_cli: str | None | UndefinedType = Undefined,
                             ) -> None:
                                 """
@@ -37919,6 +37936,9 @@ class EosDesigns(EosDesignsRootModel):
                                        OSPF interface configuration.
 
                                        Subclass of AvdModel.
+                                    hardware_forwarding:
+                                       Enable hardware forwarding for this loopback. This is required for correct forwarding in VRFs
+                                       without physical interfaces.
                                     raw_eos_cli: EOS CLI rendered directly on the Loopback interface in the final EOS configuration.
 
                                 """
