@@ -56825,6 +56825,32 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
     class RouterPathSelection(AvdModel):
         """Subclass of AvdModel."""
 
+        class MtuDiscoveryHosts(AvdModel):
+            """Subclass of AvdModel."""
+
+            _fields: ClassVar[dict] = {"enabled": {"type": bool}, "fragmentation_needed_rate_limit": {"type": int}}
+            enabled: bool | None
+            """Enable MTU discovery for hosts."""
+            fragmentation_needed_rate_limit: int | None
+            """Maximum rate of ICMP packet generation per CPU core(packets per second)."""
+
+            if TYPE_CHECKING:
+
+                def __init__(
+                    self, *, enabled: bool | None | UndefinedType = Undefined, fragmentation_needed_rate_limit: int | None | UndefinedType = Undefined
+                ) -> None:
+                    """
+                    MtuDiscoveryHosts.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        enabled: Enable MTU discovery for hosts.
+                        fragmentation_needed_rate_limit: Maximum rate of ICMP packet generation per CPU core(packets per second).
+
+                    """
+
         class PathGroupsItem(AvdModel):
             """Subclass of AvdModel."""
 
@@ -57539,6 +57565,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
         _fields: ClassVar[dict] = {
             "peer_dynamic_source": {"type": str},
+            "mtu_discovery_interval": {"type": int},
+            "mtu_discovery_hosts": {"type": MtuDiscoveryHosts},
             "path_groups": {"type": PathGroups},
             "load_balance_policies": {"type": LoadBalancePolicies},
             "policies": {"type": Policies},
@@ -57548,6 +57576,10 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         }
         peer_dynamic_source: Literal["stun"] | None
         """Source of dynamic peer discovery."""
+        mtu_discovery_interval: int | None
+        """MTU discovery interval in seconds."""
+        mtu_discovery_hosts: MtuDiscoveryHosts
+        """Subclass of AvdModel."""
         path_groups: PathGroups
         """Subclass of AvdIndexedList with `PathGroupsItem` items. Primary key is `name` (`str`)."""
         load_balance_policies: LoadBalancePolicies
@@ -57567,6 +57599,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 self,
                 *,
                 peer_dynamic_source: Literal["stun"] | None | UndefinedType = Undefined,
+                mtu_discovery_interval: int | None | UndefinedType = Undefined,
+                mtu_discovery_hosts: MtuDiscoveryHosts | UndefinedType = Undefined,
                 path_groups: PathGroups | UndefinedType = Undefined,
                 load_balance_policies: LoadBalancePolicies | UndefinedType = Undefined,
                 policies: Policies | UndefinedType = Undefined,
@@ -57582,6 +57616,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
 
                 Args:
                     peer_dynamic_source: Source of dynamic peer discovery.
+                    mtu_discovery_interval: MTU discovery interval in seconds.
+                    mtu_discovery_hosts: Subclass of AvdModel.
                     path_groups: Subclass of AvdIndexedList with `PathGroupsItem` items. Primary key is `name` (`str`).
                     load_balance_policies: Subclass of AvdIndexedList with `LoadBalancePoliciesItem` items. Primary key is `name` (`str`).
                     policies: Subclass of AvdIndexedList with `PoliciesItem` items. Primary key is `name` (`str`).
