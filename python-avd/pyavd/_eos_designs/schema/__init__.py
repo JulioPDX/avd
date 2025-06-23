@@ -3694,6 +3694,31 @@ class EosDesigns(EosDesignsRootModel):
     class FabricIpAddressing(AvdModel):
         """Subclass of AvdModel."""
 
+        class Loopback(AvdModel):
+            """Subclass of AvdModel."""
+
+            _fields: ClassVar[dict] = {"ipv6_prefix_length": {"type": int, "default": 128}}
+            ipv6_prefix_length: Literal[64, 128]
+            """
+            IPv6 prefix length used for Router ID, VTEP and diagnostic loopbacks.
+
+            Default value: `128`
+            """
+
+            if TYPE_CHECKING:
+
+                def __init__(self, *, ipv6_prefix_length: Literal[64, 128] | UndefinedType = Undefined) -> None:
+                    """
+                    Loopback.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        ipv6_prefix_length: IPv6 prefix length used for Router ID, VTEP and diagnostic loopbacks.
+
+                    """
+
         class Mlag(AvdModel):
             """Subclass of AvdModel."""
 
@@ -3775,17 +3800,23 @@ class EosDesigns(EosDesignsRootModel):
         class P2pUplinks(AvdModel):
             """Subclass of AvdModel."""
 
-            _fields: ClassVar[dict] = {"ipv4_prefix_length": {"type": int, "default": 31}}
+            _fields: ClassVar[dict] = {"ipv4_prefix_length": {"type": int, "default": 31}, "ipv6_prefix_length": {"type": int, "default": 64}}
             ipv4_prefix_length: int
             """
             IPv4 prefix length used for L3 point-to-point uplinks.
 
             Default value: `31`
             """
+            ipv6_prefix_length: int
+            """
+            IPv6 prefix length used for L3 point-to-point uplinks.
+
+            Default value: `64`
+            """
 
             if TYPE_CHECKING:
 
-                def __init__(self, *, ipv4_prefix_length: int | UndefinedType = Undefined) -> None:
+                def __init__(self, *, ipv4_prefix_length: int | UndefinedType = Undefined, ipv6_prefix_length: int | UndefinedType = Undefined) -> None:
                     """
                     P2pUplinks.
 
@@ -3794,6 +3825,7 @@ class EosDesigns(EosDesignsRootModel):
 
                     Args:
                         ipv4_prefix_length: IPv4 prefix length used for L3 point-to-point uplinks.
+                        ipv6_prefix_length: IPv6 prefix length used for L3 point-to-point uplinks.
 
                     """
 
@@ -3822,7 +3854,9 @@ class EosDesigns(EosDesignsRootModel):
 
                     """
 
-        _fields: ClassVar[dict] = {"mlag": {"type": Mlag}, "p2p_uplinks": {"type": P2pUplinks}, "wan_ha": {"type": WanHa}}
+        _fields: ClassVar[dict] = {"loopback": {"type": Loopback}, "mlag": {"type": Mlag}, "p2p_uplinks": {"type": P2pUplinks}, "wan_ha": {"type": WanHa}}
+        loopback: Loopback
+        """Subclass of AvdModel."""
         mlag: Mlag
         """Subclass of AvdModel."""
         p2p_uplinks: P2pUplinks
@@ -3837,7 +3871,12 @@ class EosDesigns(EosDesignsRootModel):
         if TYPE_CHECKING:
 
             def __init__(
-                self, *, mlag: Mlag | UndefinedType = Undefined, p2p_uplinks: P2pUplinks | UndefinedType = Undefined, wan_ha: WanHa | UndefinedType = Undefined
+                self,
+                *,
+                loopback: Loopback | UndefinedType = Undefined,
+                mlag: Mlag | UndefinedType = Undefined,
+                p2p_uplinks: P2pUplinks | UndefinedType = Undefined,
+                wan_ha: WanHa | UndefinedType = Undefined,
             ) -> None:
                 """
                 FabricIpAddressing.
@@ -3846,6 +3885,7 @@ class EosDesigns(EosDesignsRootModel):
                 Subclass of AvdModel.
 
                 Args:
+                    loopback: Subclass of AvdModel.
                     mlag: Subclass of AvdModel.
                     p2p_uplinks: Subclass of AvdModel.
                     wan_ha:
@@ -23266,6 +23306,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -23292,8 +23333,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -23314,6 +23358,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -23444,6 +23489,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -23647,12 +23699,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -23664,6 +23730,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -23809,6 +23881,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -24170,6 +24251,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -24196,8 +24278,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -24218,6 +24303,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -24327,6 +24413,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -24474,11 +24565,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -24486,6 +24587,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -24579,6 +24684,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -24835,11 +24947,22 @@ class EosDesigns(EosDesignsRootModel):
 
                             DownlinkInterfaces._item_type = str
 
-                            _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
+                            _fields: ClassVar[dict] = {
+                                "ipv4_pool": {"type": str},
+                                "ipv6_pool": {"type": str},
+                                "downlink_interfaces": {"type": DownlinkInterfaces},
+                            }
                             ipv4_pool: str | None
                             """
                             Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                             IPv4
+                            subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                            uplink interface's index in 'downlink_interfaces'.
+                            """
+                            ipv6_pool: str | None
+                            """
+                            Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                            IPv6
                             subnets used for links to downlink switches will be derived from this pool based on index the peer's
                             uplink interface's index in 'downlink_interfaces'.
                             """
@@ -24858,6 +24981,7 @@ class EosDesigns(EosDesignsRootModel):
                                     self,
                                     *,
                                     ipv4_pool: str | None | UndefinedType = Undefined,
+                                    ipv6_pool: str | None | UndefinedType = Undefined,
                                     downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -24870,6 +24994,11 @@ class EosDesigns(EosDesignsRootModel):
                                         ipv4_pool:
                                            Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                            IPv4
+                                           subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                                           uplink interface's index in 'downlink_interfaces'.
+                                        ipv6_pool:
+                                           Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                           IPv6
                                            subnets used for links to downlink switches will be derived from this pool based on index the peer's
                                            uplink interface's index in 'downlink_interfaces'.
                                         downlink_interfaces:
@@ -27363,6 +27492,7 @@ class EosDesigns(EosDesignsRootModel):
                             "structured_config": {"type": EosCliConfigGen},
                             "uplink_type": {"type": str},
                             "uplink_ipv4_pool": {"type": str},
+                            "uplink_ipv6_pool": {"type": str},
                             "uplink_interfaces": {"type": UplinkInterfaces},
                             "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                             "uplink_switches": {"type": UplinkSwitches},
@@ -27389,8 +27519,11 @@ class EosDesigns(EosDesignsRootModel):
                             "loopback_ipv4_pool": {"type": str},
                             "loopback_ipv4_address": {"type": str},
                             "vtep_loopback_ipv4_pool": {"type": str},
+                            "vtep_loopback_ipv6_pool": {"type": str},
                             "vtep_loopback_ipv4_address": {"type": str},
+                            "vtep_loopback_ipv6_address": {"type": str},
                             "loopback_ipv4_offset": {"type": int, "default": 0},
+                            "router_id_pool": {"type": str},
                             "loopback_ipv6_pool": {"type": str},
                             "loopback_ipv6_offset": {"type": int, "default": 0},
                             "vtep": {"type": bool},
@@ -27411,6 +27544,7 @@ class EosDesigns(EosDesignsRootModel):
                             "mlag_interfaces_speed": {"type": str},
                             "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                             "mlag_peer_l3_ipv4_pool": {"type": str},
+                            "mlag_peer_l3_ipv6_pool": {"type": str},
                             "mlag_peer_vlan": {"type": int, "default": 4094},
                             "mlag_peer_link_allowed_vlans": {"type": str},
                             "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -27551,6 +27685,13 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         IPv4
+                        subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                        uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                        """
+                        uplink_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        IPv6
                         subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                         uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                         """
@@ -27754,12 +27895,26 @@ class EosDesigns(EosDesignsRootModel):
                         address used for VTEP-Loopback will be derived from this pool based on the node id and
                         'loopback_ipv4_offset'.
                         """
+                        vtep_loopback_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                        address used for VTEP-Loopback will be derived from this pool based on the node id and
+                        'loopback_ipv6_offset'.
+                        """
                         vtep_loopback_ipv4_address: str | None
                         """
                         IPv4 address without mask for VTEP-Loopback.
                         When set, it takes precedence over
                         `vtep_loopback_ipv4_pool`.
                         Note: AVD does not check for validity of the IPv4 address and does not
+                        catch duplicates.
+                        """
+                        vtep_loopback_ipv6_address: str | None
+                        """
+                        IPv6 address without mask for VTEP-Loopback.
+                        When set, it takes precedence over
+                        `vtep_loopback_ipv6_pool`.
+                        Note: AVD does not check for validity of the IPv6 address and does not
                         catch duplicates.
                         """
                         loopback_ipv4_offset: int
@@ -27771,6 +27926,12 @@ class EosDesigns(EosDesignsRootModel):
                         offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                         Default value: `0`
+                        """
+                        router_id_pool: str | None
+                        """
+                        Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                        router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                        will not exist on the device.
                         """
                         loopback_ipv6_pool: str | None
                         """
@@ -27916,6 +28077,15 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         The IPv4
+                        subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                        MLAG switch.
+                        Required when MLAG leafs present in topology and they are using a separate L3 peering
+                        VLAN.
+                        """
+                        mlag_peer_l3_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        The IPv6
                         subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                         MLAG switch.
                         Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -28279,6 +28449,7 @@ class EosDesigns(EosDesignsRootModel):
                                 structured_config: EosCliConfigGen | UndefinedType = Undefined,
                                 uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                                 uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                                uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                                 uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                                 uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                                 uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -28305,8 +28476,11 @@ class EosDesigns(EosDesignsRootModel):
                                 loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv4_address: str | None | UndefinedType = Undefined,
                                 vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                                vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                                 vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                                vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                                 loopback_ipv4_offset: int | UndefinedType = Undefined,
+                                router_id_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv6_offset: int | UndefinedType = Undefined,
                                 vtep: bool | None | UndefinedType = Undefined,
@@ -28327,6 +28501,7 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                                 mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                                 mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                                mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                                 mlag_peer_vlan: int | UndefinedType = Undefined,
                                 mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                                 mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -28443,6 +28618,11 @@ class EosDesigns(EosDesignsRootModel):
                                     uplink_ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        IPv4
+                                       subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                       uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                    uplink_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       IPv6
                                        subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                        uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                     uplink_interfaces:
@@ -28590,11 +28770,21 @@ class EosDesigns(EosDesignsRootModel):
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                        address used for VTEP-Loopback will be derived from this pool based on the node id and
                                        'loopback_ipv4_offset'.
+                                    vtep_loopback_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                       address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                       'loopback_ipv6_offset'.
                                     vtep_loopback_ipv4_address:
                                        IPv4 address without mask for VTEP-Loopback.
                                        When set, it takes precedence over
                                        `vtep_loopback_ipv4_pool`.
                                        Note: AVD does not check for validity of the IPv4 address and does not
+                                       catch duplicates.
+                                    vtep_loopback_ipv6_address:
+                                       IPv6 address without mask for VTEP-Loopback.
+                                       When set, it takes precedence over
+                                       `vtep_loopback_ipv6_pool`.
+                                       Note: AVD does not check for validity of the IPv6 address and does not
                                        catch duplicates.
                                     loopback_ipv4_offset:
                                        Offset all assigned loopback IP addresses.
@@ -28602,6 +28792,10 @@ class EosDesigns(EosDesignsRootModel):
                                        different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                        For example, set the minimum
                                        offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                    router_id_pool:
+                                       Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                       router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                       will not exist on the device.
                                     loopback_ipv6_pool:
                                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                        address used for Loopback0 will be derived from this pool based on the node id and
@@ -28695,6 +28889,13 @@ class EosDesigns(EosDesignsRootModel):
                                     mlag_peer_l3_ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        The IPv4
+                                       subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                       MLAG switch.
+                                       Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                       VLAN.
+                                    mlag_peer_l3_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       The IPv6
                                        subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                        MLAG switch.
                                        Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -31404,6 +31605,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -31430,8 +31632,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -31452,6 +31657,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -31595,6 +31801,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -31798,12 +32011,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -31815,6 +32042,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -31960,6 +32193,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -32323,6 +32565,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -32349,8 +32592,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -32371,6 +32617,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -32489,6 +32736,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -32636,11 +32888,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -32648,6 +32910,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -32741,6 +33007,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -33001,11 +33274,18 @@ class EosDesigns(EosDesignsRootModel):
 
                         DownlinkInterfaces._item_type = str
 
-                        _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
+                        _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "ipv6_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
                         ipv4_pool: str | None
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         IPv4
+                        subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                        uplink interface's index in 'downlink_interfaces'.
+                        """
+                        ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        IPv6
                         subnets used for links to downlink switches will be derived from this pool based on index the peer's
                         uplink interface's index in 'downlink_interfaces'.
                         """
@@ -33021,7 +33301,11 @@ class EosDesigns(EosDesignsRootModel):
                         if TYPE_CHECKING:
 
                             def __init__(
-                                self, *, ipv4_pool: str | None | UndefinedType = Undefined, downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined
+                                self,
+                                *,
+                                ipv4_pool: str | None | UndefinedType = Undefined,
+                                ipv6_pool: str | None | UndefinedType = Undefined,
+                                downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined,
                             ) -> None:
                                 """
                                 DownlinkPoolsItem.
@@ -33033,6 +33317,11 @@ class EosDesigns(EosDesignsRootModel):
                                     ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        IPv4
+                                       subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                                       uplink interface's index in 'downlink_interfaces'.
+                                    ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       IPv6
                                        subnets used for links to downlink switches will be derived from this pool based on index the peer's
                                        uplink interface's index in 'downlink_interfaces'.
                                     downlink_interfaces:
@@ -35509,6 +35798,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -35535,8 +35825,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -35557,6 +35850,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -35697,6 +35991,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -35900,12 +36201,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -35917,6 +36232,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -36062,6 +36383,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -36425,6 +36755,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -36451,8 +36782,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -36473,6 +36807,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -36589,6 +36924,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -36736,11 +37076,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -36748,6 +37098,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -36841,6 +37195,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -42697,6 +43058,7 @@ class EosDesigns(EosDesignsRootModel):
                         "rd_override": {"type": str},
                         "rt_override": {"type": str},
                         "mlag_ibgp_peering_ipv4_pool": {"type": str},
+                        "mlag_ibgp_peering_ipv6_pool": {"type": str},
                         "ip_helpers": {"type": IpHelpers},
                         "enable_mlag_ibgp_peering_vrfs": {"type": bool},
                         "redistribute_mlag_ibgp_peering_vrfs": {"type": bool},
@@ -42784,6 +43146,14 @@ class EosDesigns(EosDesignsRootModel):
                     subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first
                     MLAG switch.
                     If not set, "mlag_peer_l3_ipv4_pool" or "mlag_peer_ipv4_pool" will be used.
+                    """
+                    mlag_ibgp_peering_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The
+                    subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first
+                    MLAG switch.
+                    If not set, "mlag_peer_l3_ipv6_pool" or "mlag_peer_ipv6_pool" will be used.
                     """
                     ip_helpers: IpHelpers
                     """
@@ -42981,6 +43351,7 @@ class EosDesigns(EosDesignsRootModel):
                             rd_override: str | None | UndefinedType = Undefined,
                             rt_override: str | None | UndefinedType = Undefined,
                             mlag_ibgp_peering_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_ibgp_peering_ipv6_pool: str | None | UndefinedType = Undefined,
                             ip_helpers: IpHelpers | UndefinedType = Undefined,
                             enable_mlag_ibgp_peering_vrfs: bool | None | UndefinedType = Undefined,
                             redistribute_mlag_ibgp_peering_vrfs: bool | None | UndefinedType = Undefined,
@@ -43060,6 +43431,12 @@ class EosDesigns(EosDesignsRootModel):
                                    subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first
                                    MLAG switch.
                                    If not set, "mlag_peer_l3_ipv4_pool" or "mlag_peer_ipv4_pool" will be used.
+                                mlag_ibgp_peering_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The
+                                   subnet used for the iBGP peering in the VRF is derived from this pool based on the ID of the first
+                                   MLAG switch.
+                                   If not set, "mlag_peer_l3_ipv6_pool" or "mlag_peer_ipv6_pool" will be used.
                                 ip_helpers:
                                    IP helper for DHCP relay.
 
@@ -46707,6 +47084,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -46733,8 +47111,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -46755,6 +47136,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -46885,6 +47267,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -47088,12 +47477,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -47105,6 +47508,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -47250,6 +47659,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -47611,6 +48029,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -47637,8 +48056,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -47659,6 +48081,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -47768,6 +48191,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -47915,11 +48343,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -47927,6 +48365,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -48020,6 +48462,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -48276,11 +48725,22 @@ class EosDesigns(EosDesignsRootModel):
 
                             DownlinkInterfaces._item_type = str
 
-                            _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
+                            _fields: ClassVar[dict] = {
+                                "ipv4_pool": {"type": str},
+                                "ipv6_pool": {"type": str},
+                                "downlink_interfaces": {"type": DownlinkInterfaces},
+                            }
                             ipv4_pool: str | None
                             """
                             Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                             IPv4
+                            subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                            uplink interface's index in 'downlink_interfaces'.
+                            """
+                            ipv6_pool: str | None
+                            """
+                            Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                            IPv6
                             subnets used for links to downlink switches will be derived from this pool based on index the peer's
                             uplink interface's index in 'downlink_interfaces'.
                             """
@@ -48299,6 +48759,7 @@ class EosDesigns(EosDesignsRootModel):
                                     self,
                                     *,
                                     ipv4_pool: str | None | UndefinedType = Undefined,
+                                    ipv6_pool: str | None | UndefinedType = Undefined,
                                     downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined,
                                 ) -> None:
                                     """
@@ -48311,6 +48772,11 @@ class EosDesigns(EosDesignsRootModel):
                                         ipv4_pool:
                                            Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                            IPv4
+                                           subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                                           uplink interface's index in 'downlink_interfaces'.
+                                        ipv6_pool:
+                                           Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                           IPv6
                                            subnets used for links to downlink switches will be derived from this pool based on index the peer's
                                            uplink interface's index in 'downlink_interfaces'.
                                         downlink_interfaces:
@@ -50804,6 +51270,7 @@ class EosDesigns(EosDesignsRootModel):
                             "structured_config": {"type": EosCliConfigGen},
                             "uplink_type": {"type": str},
                             "uplink_ipv4_pool": {"type": str},
+                            "uplink_ipv6_pool": {"type": str},
                             "uplink_interfaces": {"type": UplinkInterfaces},
                             "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                             "uplink_switches": {"type": UplinkSwitches},
@@ -50830,8 +51297,11 @@ class EosDesigns(EosDesignsRootModel):
                             "loopback_ipv4_pool": {"type": str},
                             "loopback_ipv4_address": {"type": str},
                             "vtep_loopback_ipv4_pool": {"type": str},
+                            "vtep_loopback_ipv6_pool": {"type": str},
                             "vtep_loopback_ipv4_address": {"type": str},
+                            "vtep_loopback_ipv6_address": {"type": str},
                             "loopback_ipv4_offset": {"type": int, "default": 0},
+                            "router_id_pool": {"type": str},
                             "loopback_ipv6_pool": {"type": str},
                             "loopback_ipv6_offset": {"type": int, "default": 0},
                             "vtep": {"type": bool},
@@ -50852,6 +51322,7 @@ class EosDesigns(EosDesignsRootModel):
                             "mlag_interfaces_speed": {"type": str},
                             "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                             "mlag_peer_l3_ipv4_pool": {"type": str},
+                            "mlag_peer_l3_ipv6_pool": {"type": str},
                             "mlag_peer_vlan": {"type": int, "default": 4094},
                             "mlag_peer_link_allowed_vlans": {"type": str},
                             "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -50992,6 +51463,13 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         IPv4
+                        subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                        uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                        """
+                        uplink_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        IPv6
                         subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                         uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                         """
@@ -51195,12 +51673,26 @@ class EosDesigns(EosDesignsRootModel):
                         address used for VTEP-Loopback will be derived from this pool based on the node id and
                         'loopback_ipv4_offset'.
                         """
+                        vtep_loopback_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                        address used for VTEP-Loopback will be derived from this pool based on the node id and
+                        'loopback_ipv6_offset'.
+                        """
                         vtep_loopback_ipv4_address: str | None
                         """
                         IPv4 address without mask for VTEP-Loopback.
                         When set, it takes precedence over
                         `vtep_loopback_ipv4_pool`.
                         Note: AVD does not check for validity of the IPv4 address and does not
+                        catch duplicates.
+                        """
+                        vtep_loopback_ipv6_address: str | None
+                        """
+                        IPv6 address without mask for VTEP-Loopback.
+                        When set, it takes precedence over
+                        `vtep_loopback_ipv6_pool`.
+                        Note: AVD does not check for validity of the IPv6 address and does not
                         catch duplicates.
                         """
                         loopback_ipv4_offset: int
@@ -51212,6 +51704,12 @@ class EosDesigns(EosDesignsRootModel):
                         offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                         Default value: `0`
+                        """
+                        router_id_pool: str | None
+                        """
+                        Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                        router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                        will not exist on the device.
                         """
                         loopback_ipv6_pool: str | None
                         """
@@ -51357,6 +51855,15 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         The IPv4
+                        subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                        MLAG switch.
+                        Required when MLAG leafs present in topology and they are using a separate L3 peering
+                        VLAN.
+                        """
+                        mlag_peer_l3_ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        The IPv6
                         subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                         MLAG switch.
                         Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -51720,6 +52227,7 @@ class EosDesigns(EosDesignsRootModel):
                                 structured_config: EosCliConfigGen | UndefinedType = Undefined,
                                 uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                                 uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                                uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                                 uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                                 uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                                 uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -51746,8 +52254,11 @@ class EosDesigns(EosDesignsRootModel):
                                 loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv4_address: str | None | UndefinedType = Undefined,
                                 vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                                vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                                 vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                                vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                                 loopback_ipv4_offset: int | UndefinedType = Undefined,
+                                router_id_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                                 loopback_ipv6_offset: int | UndefinedType = Undefined,
                                 vtep: bool | None | UndefinedType = Undefined,
@@ -51768,6 +52279,7 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                                 mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                                 mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                                mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                                 mlag_peer_vlan: int | UndefinedType = Undefined,
                                 mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                                 mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -51884,6 +52396,11 @@ class EosDesigns(EosDesignsRootModel):
                                     uplink_ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        IPv4
+                                       subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                       uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                    uplink_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       IPv6
                                        subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                        uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                     uplink_interfaces:
@@ -52031,11 +52548,21 @@ class EosDesigns(EosDesignsRootModel):
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                        address used for VTEP-Loopback will be derived from this pool based on the node id and
                                        'loopback_ipv4_offset'.
+                                    vtep_loopback_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                       address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                       'loopback_ipv6_offset'.
                                     vtep_loopback_ipv4_address:
                                        IPv4 address without mask for VTEP-Loopback.
                                        When set, it takes precedence over
                                        `vtep_loopback_ipv4_pool`.
                                        Note: AVD does not check for validity of the IPv4 address and does not
+                                       catch duplicates.
+                                    vtep_loopback_ipv6_address:
+                                       IPv6 address without mask for VTEP-Loopback.
+                                       When set, it takes precedence over
+                                       `vtep_loopback_ipv6_pool`.
+                                       Note: AVD does not check for validity of the IPv6 address and does not
                                        catch duplicates.
                                     loopback_ipv4_offset:
                                        Offset all assigned loopback IP addresses.
@@ -52043,6 +52570,10 @@ class EosDesigns(EosDesignsRootModel):
                                        different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                        For example, set the minimum
                                        offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                    router_id_pool:
+                                       Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                       router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                       will not exist on the device.
                                     loopback_ipv6_pool:
                                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                        address used for Loopback0 will be derived from this pool based on the node id and
@@ -52136,6 +52667,13 @@ class EosDesigns(EosDesignsRootModel):
                                     mlag_peer_l3_ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        The IPv4
+                                       subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                       MLAG switch.
+                                       Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                       VLAN.
+                                    mlag_peer_l3_ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       The IPv6
                                        subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                        MLAG switch.
                                        Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -54845,6 +55383,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -54871,8 +55410,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -54893,6 +55435,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -55036,6 +55579,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -55239,12 +55789,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -55256,6 +55820,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -55401,6 +55971,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -55764,6 +56343,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -55790,8 +56370,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -55812,6 +56395,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -55930,6 +56514,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -56077,11 +56666,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -56089,6 +56688,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -56182,6 +56785,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -56442,11 +57052,18 @@ class EosDesigns(EosDesignsRootModel):
 
                         DownlinkInterfaces._item_type = str
 
-                        _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
+                        _fields: ClassVar[dict] = {"ipv4_pool": {"type": str}, "ipv6_pool": {"type": str}, "downlink_interfaces": {"type": DownlinkInterfaces}}
                         ipv4_pool: str | None
                         """
                         Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                         IPv4
+                        subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                        uplink interface's index in 'downlink_interfaces'.
+                        """
+                        ipv6_pool: str | None
+                        """
+                        Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                        IPv6
                         subnets used for links to downlink switches will be derived from this pool based on index the peer's
                         uplink interface's index in 'downlink_interfaces'.
                         """
@@ -56462,7 +57079,11 @@ class EosDesigns(EosDesignsRootModel):
                         if TYPE_CHECKING:
 
                             def __init__(
-                                self, *, ipv4_pool: str | None | UndefinedType = Undefined, downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined
+                                self,
+                                *,
+                                ipv4_pool: str | None | UndefinedType = Undefined,
+                                ipv6_pool: str | None | UndefinedType = Undefined,
+                                downlink_interfaces: DownlinkInterfaces | UndefinedType = Undefined,
                             ) -> None:
                                 """
                                 DownlinkPoolsItem.
@@ -56474,6 +57095,11 @@ class EosDesigns(EosDesignsRootModel):
                                     ipv4_pool:
                                        Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                        IPv4
+                                       subnets used for links to downlink switches will be derived from this pool based on index the peer's
+                                       uplink interface's index in 'downlink_interfaces'.
+                                    ipv6_pool:
+                                       Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                       IPv6
                                        subnets used for links to downlink switches will be derived from this pool based on index the peer's
                                        uplink interface's index in 'downlink_interfaces'.
                                     downlink_interfaces:
@@ -58950,6 +59576,7 @@ class EosDesigns(EosDesignsRootModel):
                         "structured_config": {"type": EosCliConfigGen},
                         "uplink_type": {"type": str},
                         "uplink_ipv4_pool": {"type": str},
+                        "uplink_ipv6_pool": {"type": str},
                         "uplink_interfaces": {"type": UplinkInterfaces},
                         "uplink_switch_interfaces": {"type": UplinkSwitchInterfaces},
                         "uplink_switches": {"type": UplinkSwitches},
@@ -58976,8 +59603,11 @@ class EosDesigns(EosDesignsRootModel):
                         "loopback_ipv4_pool": {"type": str},
                         "loopback_ipv4_address": {"type": str},
                         "vtep_loopback_ipv4_pool": {"type": str},
+                        "vtep_loopback_ipv6_pool": {"type": str},
                         "vtep_loopback_ipv4_address": {"type": str},
+                        "vtep_loopback_ipv6_address": {"type": str},
                         "loopback_ipv4_offset": {"type": int, "default": 0},
+                        "router_id_pool": {"type": str},
                         "loopback_ipv6_pool": {"type": str},
                         "loopback_ipv6_offset": {"type": int, "default": 0},
                         "vtep": {"type": bool},
@@ -58998,6 +59628,7 @@ class EosDesigns(EosDesignsRootModel):
                         "mlag_interfaces_speed": {"type": str},
                         "mlag_peer_l3_vlan": {"type": int, "default": 4093},
                         "mlag_peer_l3_ipv4_pool": {"type": str},
+                        "mlag_peer_l3_ipv6_pool": {"type": str},
                         "mlag_peer_vlan": {"type": int, "default": 4094},
                         "mlag_peer_link_allowed_vlans": {"type": str},
                         "mlag_peer_address_family": {"type": str, "default": "ipv4"},
@@ -59138,6 +59769,13 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     IPv4
+                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                    """
+                    uplink_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    IPv6
                     subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                     uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                     """
@@ -59341,12 +59979,26 @@ class EosDesigns(EosDesignsRootModel):
                     address used for VTEP-Loopback will be derived from this pool based on the node id and
                     'loopback_ipv4_offset'.
                     """
+                    vtep_loopback_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                    address used for VTEP-Loopback will be derived from this pool based on the node id and
+                    'loopback_ipv6_offset'.
+                    """
                     vtep_loopback_ipv4_address: str | None
                     """
                     IPv4 address without mask for VTEP-Loopback.
                     When set, it takes precedence over
                     `vtep_loopback_ipv4_pool`.
                     Note: AVD does not check for validity of the IPv4 address and does not
+                    catch duplicates.
+                    """
+                    vtep_loopback_ipv6_address: str | None
+                    """
+                    IPv6 address without mask for VTEP-Loopback.
+                    When set, it takes precedence over
+                    `vtep_loopback_ipv6_pool`.
+                    Note: AVD does not check for validity of the IPv6 address and does not
                     catch duplicates.
                     """
                     loopback_ipv4_offset: int
@@ -59358,6 +60010,12 @@ class EosDesigns(EosDesignsRootModel):
                     offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
 
                     Default value: `0`
+                    """
+                    router_id_pool: str | None
+                    """
+                    Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                    router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                    will not exist on the device.
                     """
                     loopback_ipv6_pool: str | None
                     """
@@ -59503,6 +60161,15 @@ class EosDesigns(EosDesignsRootModel):
                     """
                     Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                     The IPv4
+                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                    MLAG switch.
+                    Required when MLAG leafs present in topology and they are using a separate L3 peering
+                    VLAN.
+                    """
+                    mlag_peer_l3_ipv6_pool: str | None
+                    """
+                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                    The IPv6
                     subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                     MLAG switch.
                     Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -59866,6 +60533,7 @@ class EosDesigns(EosDesignsRootModel):
                             structured_config: EosCliConfigGen | UndefinedType = Undefined,
                             uplink_type: Literal["p2p", "port-channel", "p2p-vrfs", "lan"] | None | UndefinedType = Undefined,
                             uplink_ipv4_pool: str | None | UndefinedType = Undefined,
+                            uplink_ipv6_pool: str | None | UndefinedType = Undefined,
                             uplink_interfaces: UplinkInterfaces | UndefinedType = Undefined,
                             uplink_switch_interfaces: UplinkSwitchInterfaces | UndefinedType = Undefined,
                             uplink_switches: UplinkSwitches | UndefinedType = Undefined,
@@ -59892,8 +60560,11 @@ class EosDesigns(EosDesignsRootModel):
                             loopback_ipv4_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv4_address: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_pool: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             vtep_loopback_ipv4_address: str | None | UndefinedType = Undefined,
+                            vtep_loopback_ipv6_address: str | None | UndefinedType = Undefined,
                             loopback_ipv4_offset: int | UndefinedType = Undefined,
+                            router_id_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_pool: str | None | UndefinedType = Undefined,
                             loopback_ipv6_offset: int | UndefinedType = Undefined,
                             vtep: bool | None | UndefinedType = Undefined,
@@ -59914,6 +60585,7 @@ class EosDesigns(EosDesignsRootModel):
                             mlag_interfaces_speed: str | None | UndefinedType = Undefined,
                             mlag_peer_l3_vlan: int | UndefinedType = Undefined,
                             mlag_peer_l3_ipv4_pool: str | None | UndefinedType = Undefined,
+                            mlag_peer_l3_ipv6_pool: str | None | UndefinedType = Undefined,
                             mlag_peer_vlan: int | UndefinedType = Undefined,
                             mlag_peer_link_allowed_vlans: str | None | UndefinedType = Undefined,
                             mlag_peer_address_family: Literal["ipv4", "ipv6"] | UndefinedType = Undefined,
@@ -60030,6 +60702,11 @@ class EosDesigns(EosDesignsRootModel):
                                 uplink_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    IPv4
+                                   subnets used to connect to uplink switches will be deviced from this pool based on the node id,
+                                   uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
+                                uplink_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   IPv6
                                    subnets used to connect to uplink switches will be deviced from this pool based on the node id,
                                    uplink interface index, 'max_uplink_switches' and 'max_parallel_uplinks'.
                                 uplink_interfaces:
@@ -60177,11 +60854,21 @@ class EosDesigns(EosDesignsRootModel):
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address). The IPv4
                                    address used for VTEP-Loopback will be derived from this pool based on the node id and
                                    'loopback_ipv4_offset'.
+                                vtep_loopback_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
+                                   address used for VTEP-Loopback will be derived from this pool based on the node id and
+                                   'loopback_ipv6_offset'.
                                 vtep_loopback_ipv4_address:
                                    IPv4 address without mask for VTEP-Loopback.
                                    When set, it takes precedence over
                                    `vtep_loopback_ipv4_pool`.
                                    Note: AVD does not check for validity of the IPv4 address and does not
+                                   catch duplicates.
+                                vtep_loopback_ipv6_address:
+                                   IPv6 address without mask for VTEP-Loopback.
+                                   When set, it takes precedence over
+                                   `vtep_loopback_ipv6_pool`.
+                                   Note: AVD does not check for validity of the IPv6 address and does not
                                    catch duplicates.
                                 loopback_ipv4_offset:
                                    Offset all assigned loopback IP addresses.
@@ -60189,6 +60876,10 @@ class EosDesigns(EosDesignsRootModel):
                                    different node_types (like spine and l3leaf) to avoid overlapping IPs.
                                    For example, set the minimum
                                    offset l3leaf.defaults.loopback_ipv4_offset: < total # spine switches > or vice versa.
+                                router_id_pool:
+                                   Required when underlay_ipv6_numbered is used to configured an IPv6 underlay and IPv6 overlay.
+                                   router_id_pool is an IPv4 subnet used only for allocation of BGP router-id's since an IPv4 address
+                                   will not exist on the device.
                                 loopback_ipv6_pool:
                                    Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address). The IPv6
                                    address used for Loopback0 will be derived from this pool based on the node id and
@@ -60282,6 +60973,13 @@ class EosDesigns(EosDesignsRootModel):
                                 mlag_peer_l3_ipv4_pool:
                                    Comma separated list of prefixes (IPv4 address/Mask) or ranges (IPv4_address-IPv4_address).
                                    The IPv4
+                                   subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
+                                   MLAG switch.
+                                   Required when MLAG leafs present in topology and they are using a separate L3 peering
+                                   VLAN.
+                                mlag_peer_l3_ipv6_pool:
+                                   Comma separated list of prefixes (IPv6 address/Mask) or ranges (IPv6_address-IPv6_address).
+                                   The IPv6
                                    subnet used for MLAG underlay L3 peering is derived from this pool based on the node id of the first
                                    MLAG switch.
                                    Required when MLAG leafs present in topology and they are using a separate L3 peering
@@ -61018,6 +61716,7 @@ class EosDesigns(EosDesignsRootModel):
         "underlay_filter_peer_as": {"type": bool, "default": False},
         "underlay_filter_redistribute_connected": {"type": bool, "default": True},
         "underlay_ipv6": {"type": bool, "default": False},
+        "underlay_ipv6_numbered": {"type": bool, "default": False},
         "underlay_isis_authentication_key": {"type": str},
         "underlay_isis_authentication_mode": {"type": str},
         "underlay_isis_bfd": {"type": bool, "default": False},
@@ -62631,6 +63330,30 @@ class EosDesigns(EosDesignsRootModel):
 
     Default value: `False`
     """
+    underlay_ipv6_numbered: bool
+    """
+    This feature allows pure IPv6 underlay routing protocol with numbered addresses.
+    Currently sets both
+    underlay and overlay, including MLAG, to use IPv6 addresses.
+    Currently BGP peer-groups are named
+    with IPv4 by default. This can be modified under `bgp_peer_groups`.
+    Requires:
+      - "underlay_ipv6:
+    true"
+      - "loopback_ipv6_pool"
+      - "underlay_routing_protocol: ebgp"
+    Some settings are not yet
+    supported with IPv6 underlay:
+      - underlay_multicast
+      - underlay_multicast_rp_interfaces
+      -
+    underlay_rfc5549
+      - wan_role
+      - vtep_vvtep_ip
+      - inband_ztp
+
+    Default value: `False`
+    """
     underlay_isis_authentication_key: str | None
     """Type-7 encrypted password."""
     underlay_isis_authentication_mode: Literal["md5", "text"] | None
@@ -63097,6 +63820,7 @@ class EosDesigns(EosDesignsRootModel):
             underlay_filter_peer_as: bool | UndefinedType = Undefined,
             underlay_filter_redistribute_connected: bool | UndefinedType = Undefined,
             underlay_ipv6: bool | UndefinedType = Undefined,
+            underlay_ipv6_numbered: bool | UndefinedType = Undefined,
             underlay_isis_authentication_key: str | None | UndefinedType = Undefined,
             underlay_isis_authentication_mode: Literal["md5", "text"] | None | UndefinedType = Undefined,
             underlay_isis_bfd: bool | UndefinedType = Undefined,
@@ -64278,6 +65002,26 @@ class EosDesigns(EosDesignsRootModel):
                    advertisements as VXLAN tunnel endpoints.
                    Requires "underlay_rfc5549: true" and "loopback_ipv6_pool"
                    under the node type settings.
+                underlay_ipv6_numbered:
+                   This feature allows pure IPv6 underlay routing protocol with numbered addresses.
+                   Currently sets both
+                   underlay and overlay, including MLAG, to use IPv6 addresses.
+                   Currently BGP peer-groups are named
+                   with IPv4 by default. This can be modified under `bgp_peer_groups`.
+                   Requires:
+                     - "underlay_ipv6:
+                   true"
+                     - "loopback_ipv6_pool"
+                     - "underlay_routing_protocol: ebgp"
+                   Some settings are not yet
+                   supported with IPv6 underlay:
+                     - underlay_multicast
+                     - underlay_multicast_rp_interfaces
+                     -
+                   underlay_rfc5549
+                     - wan_role
+                     - vtep_vvtep_ip
+                     - inband_ztp
                 underlay_isis_authentication_key: Type-7 encrypted password.
                 underlay_isis_authentication_mode: Underlay ISIS authentication mode.
                 underlay_isis_bfd: Enable BFD for ISIS on all underlay links.
