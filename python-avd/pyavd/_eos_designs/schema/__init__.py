@@ -14202,6 +14202,103 @@ class EosDesigns(EosDesignsRootModel):
 
                 """
 
+    class SshSettings(AvdModel):
+        """Subclass of AvdModel."""
+
+        class VrfsItem(AvdModel):
+            """Subclass of AvdModel."""
+
+            _fields: ClassVar[dict] = {"name": {"type": str}, "enabled": {"type": bool}, "ipv4_acl": {"type": str}, "ipv6_acl": {"type": str}}
+            name: str
+            """
+            VRF name.
+            The value will be interpreted according to these rules:
+            - `use_mgmt_interface_vrf` will
+            configure SSH for the VRF set with `mgmt_interface_vrf`.
+              An error will be raised if `mgmt_ip` or
+            `ipv6_mgmt_ip` are not configured for the device.
+            - `use_inband_mgmt_vrf` will configure SSH for the
+            VRF set with `inband_mgmt_vrf`.
+              An error will be raised if inband management is not configured for
+            the device.
+            - `use_default_mgmt_method_vrf` will configure the VRF for one of the two options above
+            depending on the value of `default_mgmt_method`.
+            - Any other string will be used directly as the VRF
+            name.
+            """
+            enabled: bool
+            """Enable SSH in VRF."""
+            ipv4_acl: str | None
+            """IPv4 access-list name."""
+            ipv6_acl: str | None
+            """IPv6 access-list name."""
+
+            if TYPE_CHECKING:
+
+                def __init__(
+                    self,
+                    *,
+                    name: str | UndefinedType = Undefined,
+                    enabled: bool | UndefinedType = Undefined,
+                    ipv4_acl: str | None | UndefinedType = Undefined,
+                    ipv6_acl: str | None | UndefinedType = Undefined,
+                ) -> None:
+                    """
+                    VrfsItem.
+
+
+                    Subclass of AvdModel.
+
+                    Args:
+                        name:
+                           VRF name.
+                           The value will be interpreted according to these rules:
+                           - `use_mgmt_interface_vrf` will
+                           configure SSH for the VRF set with `mgmt_interface_vrf`.
+                             An error will be raised if `mgmt_ip` or
+                           `ipv6_mgmt_ip` are not configured for the device.
+                           - `use_inband_mgmt_vrf` will configure SSH for the
+                           VRF set with `inband_mgmt_vrf`.
+                             An error will be raised if inband management is not configured for
+                           the device.
+                           - `use_default_mgmt_method_vrf` will configure the VRF for one of the two options above
+                           depending on the value of `default_mgmt_method`.
+                           - Any other string will be used directly as the VRF
+                           name.
+                        enabled: Enable SSH in VRF.
+                        ipv4_acl: IPv4 access-list name.
+                        ipv6_acl: IPv6 access-list name.
+
+                    """
+
+        class Vrfs(AvdIndexedList[str, VrfsItem]):
+            """Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`)."""
+
+            _primary_key: ClassVar[str] = "name"
+
+        Vrfs._item_type = VrfsItem
+
+        _fields: ClassVar[dict] = {"vrfs": {"type": Vrfs}, "idle_timeout": {"type": int}}
+        vrfs: Vrfs
+        """Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`)."""
+        idle_timeout: int | None
+        """Idle timeout in minutes."""
+
+        if TYPE_CHECKING:
+
+            def __init__(self, *, vrfs: Vrfs | UndefinedType = Undefined, idle_timeout: int | None | UndefinedType = Undefined) -> None:
+                """
+                SshSettings.
+
+
+                Subclass of AvdModel.
+
+                Args:
+                    vrfs: Subclass of AvdIndexedList with `VrfsItem` items. Primary key is `name` (`str`).
+                    idle_timeout: Idle timeout in minutes.
+
+                """
+
     class SviProfilesItem(AvdModel):
         """Subclass of AvdModel."""
 
@@ -62428,6 +62525,7 @@ class EosDesigns(EosDesignsRootModel):
         "shutdown_interfaces_towards_undeployed_peers": {"type": bool, "default": True},
         "snmp_settings": {"type": SnmpSettings},
         "source_interfaces": {"type": SourceInterfaces},
+        "ssh_settings": {"type": SshSettings},
         "svi_profiles": {"type": SviProfiles},
         "system_mac_address": {"type": str},
         "terminattr_disable_aaa": {"type": bool, "default": False},
@@ -62907,14 +63005,17 @@ class EosDesigns(EosDesignsRootModel):
     `ntp_settings`
       - `sflow_settings`
       - `snmp_settings`
+      - `ssh_settings`
 
-    `oob` means the protocols will be
-    configured with the VRF set by `mgmt_interface_vrf` and `mgmt_interface` as the source interface.
-    `inband` means the protocols will be configured with the VRF set by `inband_mgmt_vrf` and
-    `inband_mgmt_interface` as the source interface.
-    `none` means the VRF and or interface must be
-    manually set for each protocol.
-    This can be overridden under the settings for each protocol.
+    `oob` means the
+    protocols will be configured with the VRF set by `mgmt_interface_vrf` and `mgmt_interface` as the
+    source interface.
+    `inband` means the protocols will be configured with the VRF set by
+    `inband_mgmt_vrf` and `inband_mgmt_interface` as the source interface.
+    `none` means the VRF and or
+    interface must be manually set for each protocol.
+    This can be overridden under the settings for each
+    protocol.
 
     Default value: `"oob"`
     """
@@ -63968,6 +64069,8 @@ class EosDesigns(EosDesignsRootModel):
 
     Subclass of AvdModel.
     """
+    ssh_settings: SshSettings
+    """Subclass of AvdModel."""
     svi_profiles: SviProfiles
     """
     Profiles to share common settings for SVIs under `<network_services_key>.[].vrfs.svis`.
@@ -64532,6 +64635,7 @@ class EosDesigns(EosDesignsRootModel):
             shutdown_interfaces_towards_undeployed_peers: bool | UndefinedType = Undefined,
             snmp_settings: SnmpSettings | UndefinedType = Undefined,
             source_interfaces: SourceInterfaces | UndefinedType = Undefined,
+            ssh_settings: SshSettings | UndefinedType = Undefined,
             svi_profiles: SviProfiles | UndefinedType = Undefined,
             system_mac_address: str | None | UndefinedType = Undefined,
             terminattr_disable_aaa: bool | UndefinedType = Undefined,
@@ -64909,14 +65013,17 @@ class EosDesigns(EosDesignsRootModel):
                    `ntp_settings`
                      - `sflow_settings`
                      - `snmp_settings`
+                     - `ssh_settings`
 
-                   `oob` means the protocols will be
-                   configured with the VRF set by `mgmt_interface_vrf` and `mgmt_interface` as the source interface.
-                   `inband` means the protocols will be configured with the VRF set by `inband_mgmt_vrf` and
-                   `inband_mgmt_interface` as the source interface.
-                   `none` means the VRF and or interface must be
-                   manually set for each protocol.
-                   This can be overridden under the settings for each protocol.
+                   `oob` means the
+                   protocols will be configured with the VRF set by `mgmt_interface_vrf` and `mgmt_interface` as the
+                   source interface.
+                   `inband` means the protocols will be configured with the VRF set by
+                   `inband_mgmt_vrf` and `inband_mgmt_interface` as the source interface.
+                   `none` means the VRF and or
+                   interface must be manually set for each protocol.
+                   This can be overridden under the settings for each
+                   protocol.
                 default_network_ports_description:
                    Default description or description template to be used on all ports defined under `network_ports`.
                    This can be a template using the AVD string formatter syntax:
@@ -65667,6 +65774,7 @@ class EosDesigns(EosDesignsRootModel):
                    interface is not found for a device.
 
                    Subclass of AvdModel.
+                ssh_settings: Subclass of AvdModel.
                 svi_profiles:
                    Profiles to share common settings for SVIs under `<network_services_key>.[].vrfs.svis`.
                    Keys are the
