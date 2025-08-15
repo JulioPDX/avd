@@ -17237,6 +17237,7 @@ class EosDesigns(EosDesignsRootModel):
                 "name": {"type": str},
                 "enabled": {"type": bool},
                 "description": {"type": str},
+                "arp_gratuitous_accept": {"type": bool},
                 "ip_address": {"type": str},
                 "ipv6_address": {"type": str},
                 "ipv6_enable": {"type": bool},
@@ -17276,6 +17277,8 @@ class EosDesigns(EosDesignsRootModel):
             """Enable or disable interface."""
             description: str | None
             """SVI description. By default set to VLAN name."""
+            arp_gratuitous_accept: bool | None
+            """Accept gratuitous ARP."""
             ip_address: str | None
             """IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node."""
             ipv6_address: str | None
@@ -17471,6 +17474,7 @@ class EosDesigns(EosDesignsRootModel):
                     name: str | None | UndefinedType = Undefined,
                     enabled: bool | None | UndefinedType = Undefined,
                     description: str | None | UndefinedType = Undefined,
+                    arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                     ip_address: str | None | UndefinedType = Undefined,
                     ipv6_address: str | None | UndefinedType = Undefined,
                     ipv6_enable: bool | None | UndefinedType = Undefined,
@@ -17513,6 +17517,7 @@ class EosDesigns(EosDesignsRootModel):
                         name: VLAN name.
                         enabled: Enable or disable interface.
                         description: SVI description. By default set to VLAN name.
+                        arp_gratuitous_accept: Accept gratuitous ARP.
                         ip_address: IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node.
                         ipv6_address: IPv6_address/Mask. Usually set under "nodes" to have unique IPv6 addresses per node.
                         ipv6_enable: Explicitly enable/disable link-local IPv6 addressing.
@@ -18159,6 +18164,7 @@ class EosDesigns(EosDesignsRootModel):
             "name": {"type": str},
             "enabled": {"type": bool},
             "description": {"type": str},
+            "arp_gratuitous_accept": {"type": bool},
             "ip_address": {"type": str},
             "ipv6_address": {"type": str},
             "ipv6_enable": {"type": bool},
@@ -18214,6 +18220,8 @@ class EosDesigns(EosDesignsRootModel):
         """Enable or disable interface."""
         description: str | None
         """SVI description. By default set to VLAN name."""
+        arp_gratuitous_accept: bool | None
+        """Accept gratuitous ARP."""
         ip_address: str | None
         """IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node."""
         ipv6_address: str | None
@@ -18411,6 +18419,7 @@ class EosDesigns(EosDesignsRootModel):
                 name: str | None | UndefinedType = Undefined,
                 enabled: bool | None | UndefinedType = Undefined,
                 description: str | None | UndefinedType = Undefined,
+                arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                 ip_address: str | None | UndefinedType = Undefined,
                 ipv6_address: str | None | UndefinedType = Undefined,
                 ipv6_enable: bool | None | UndefinedType = Undefined,
@@ -18465,6 +18474,7 @@ class EosDesigns(EosDesignsRootModel):
                     name: VLAN name.
                     enabled: Enable or disable interface.
                     description: SVI description. By default set to VLAN name.
+                    arp_gratuitous_accept: Accept gratuitous ARP.
                     ip_address: IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node.
                     ipv6_address: IPv6_address/Mask. Usually set under "nodes" to have unique IPv6 addresses per node.
                     ipv6_enable: Explicitly enable/disable link-local IPv6 addressing.
@@ -43500,6 +43510,7 @@ class EosDesigns(EosDesignsRootModel):
                                 "name": {"type": str},
                                 "enabled": {"type": bool},
                                 "description": {"type": str},
+                                "arp_gratuitous_accept": {"type": bool},
                                 "ip_address": {"type": str},
                                 "ipv6_address": {"type": str},
                                 "ipv6_enable": {"type": bool},
@@ -43549,6 +43560,8 @@ class EosDesigns(EosDesignsRootModel):
                             """Enable or disable interface."""
                             description: str | None
                             """SVI description. By default set to VLAN name."""
+                            arp_gratuitous_accept: bool | None
+                            """Accept gratuitous ARP."""
                             ip_address: str | None
                             """IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node."""
                             ipv6_address: str | None
@@ -43745,6 +43758,7 @@ class EosDesigns(EosDesignsRootModel):
                                     name: str | None | UndefinedType = Undefined,
                                     enabled: bool | None | UndefinedType = Undefined,
                                     description: str | None | UndefinedType = Undefined,
+                                    arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                                     ip_address: str | None | UndefinedType = Undefined,
                                     ipv6_address: str | None | UndefinedType = Undefined,
                                     ipv6_enable: bool | None | UndefinedType = Undefined,
@@ -43793,6 +43807,7 @@ class EosDesigns(EosDesignsRootModel):
                                         name: VLAN name.
                                         enabled: Enable or disable interface.
                                         description: SVI description. By default set to VLAN name.
+                                        arp_gratuitous_accept: Accept gratuitous ARP.
                                         ip_address: IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node.
                                         ipv6_address: IPv6_address/Mask. Usually set under "nodes" to have unique IPv6 addresses per node.
                                         ipv6_enable: Explicitly enable/disable link-local IPv6 addressing.
@@ -44446,6 +44461,7 @@ class EosDesigns(EosDesignsRootModel):
                             "nodes": {"type": Nodes},
                             "enabled": {"type": bool},
                             "description": {"type": str},
+                            "arp_gratuitous_accept": {"type": bool},
                             "ip_address": {"type": str},
                             "ipv6_address": {"type": str},
                             "ipv6_enable": {"type": bool},
@@ -44519,6 +44535,8 @@ class EosDesigns(EosDesignsRootModel):
                         """Enable or disable interface."""
                         description: str | None
                         """SVI description. By default set to VLAN name."""
+                        arp_gratuitous_accept: bool | None
+                        """Accept gratuitous ARP."""
                         ip_address: str | None
                         """IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node."""
                         ipv6_address: str | None
@@ -44718,6 +44736,7 @@ class EosDesigns(EosDesignsRootModel):
                                 nodes: Nodes | UndefinedType = Undefined,
                                 enabled: bool | None | UndefinedType = Undefined,
                                 description: str | None | UndefinedType = Undefined,
+                                arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                                 ip_address: str | None | UndefinedType = Undefined,
                                 ipv6_address: str | None | UndefinedType = Undefined,
                                 ipv6_enable: bool | None | UndefinedType = Undefined,
@@ -44784,6 +44803,7 @@ class EosDesigns(EosDesignsRootModel):
                                        Subclass of AvdIndexedList with `NodesItem` items. Primary key is `node` (`str`).
                                     enabled: Enable or disable interface.
                                     description: SVI description. By default set to VLAN name.
+                                    arp_gratuitous_accept: Accept gratuitous ARP.
                                     ip_address: IPv4_address/Mask. Usually set under "nodes" to have unique IPv4 addresses per node.
                                     ipv6_address: IPv6_address/Mask. Usually set under "nodes" to have unique IPv6 addresses per node.
                                     ipv6_enable: Explicitly enable/disable link-local IPv6 addressing.
@@ -45280,6 +45300,7 @@ class EosDesigns(EosDesignsRootModel):
                             "static_routes": {"type": StaticRoutes},
                             "ipv6_static_routes": {"type": Ipv6StaticRoutes},
                             "nodes": {"type": Nodes},
+                            "arp_gratuitous_accept": {"type": bool},
                             "description": {"type": str},
                             "descriptions": {"type": Descriptions},
                             "enabled": {"type": bool, "default": True},
@@ -45320,6 +45341,8 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         nodes: Nodes
                         """Subclass of AvdList with `str` items."""
+                        arp_gratuitous_accept: bool | None
+                        """Accept gratuitous ARP."""
                         description: str | None
                         descriptions: Descriptions
                         """
@@ -45386,6 +45409,7 @@ class EosDesigns(EosDesignsRootModel):
                                 static_routes: StaticRoutes | UndefinedType = Undefined,
                                 ipv6_static_routes: Ipv6StaticRoutes | UndefinedType = Undefined,
                                 nodes: Nodes | UndefinedType = Undefined,
+                                arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                                 description: str | None | UndefinedType = Undefined,
                                 descriptions: Descriptions | UndefinedType = Undefined,
                                 enabled: bool | UndefinedType = Undefined,
@@ -45424,6 +45448,7 @@ class EosDesigns(EosDesignsRootModel):
                                        Subclass of
                                        AvdList with `Ipv6StaticRoutesItem` items.
                                     nodes: Subclass of AvdList with `str` items.
+                                    arp_gratuitous_accept: Accept gratuitous ARP.
                                     description: description
                                     descriptions:
                                        "descriptions" has precedence over "description".
@@ -45857,6 +45882,7 @@ class EosDesigns(EosDesignsRootModel):
                         _fields: ClassVar[dict] = {
                             "name": {"type": str},
                             "node": {"type": str},
+                            "arp_gratuitous_accept": {"type": bool},
                             "description": {"type": str},
                             "mode": {"type": str, "default": "active"},
                             "member_interfaces": {"type": MemberInterfaces},
@@ -45883,6 +45909,8 @@ class EosDesigns(EosDesignsRootModel):
                         """
                         node: str
                         """Node."""
+                        arp_gratuitous_accept: bool | None
+                        """Accept gratuitous ARP."""
                         description: str | None
                         """
                         Interface description.
@@ -45965,6 +45993,7 @@ class EosDesigns(EosDesignsRootModel):
                                 *,
                                 name: str | UndefinedType = Undefined,
                                 node: str | UndefinedType = Undefined,
+                                arp_gratuitous_accept: bool | None | UndefinedType = Undefined,
                                 description: str | None | UndefinedType = Undefined,
                                 mode: Literal["active", "passive", "on"] | UndefinedType = Undefined,
                                 member_interfaces: MemberInterfaces | UndefinedType = Undefined,
@@ -45995,6 +46024,7 @@ class EosDesigns(EosDesignsRootModel):
                                        For a
                                        Port-Channel subinterface, the parent Port-Channel interface must be defined as well.
                                     node: Node.
+                                    arp_gratuitous_accept: Accept gratuitous ARP.
                                     description:
                                        Interface description.
                                        If not set, a default description will be configured with '[<peer>[
