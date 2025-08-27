@@ -34289,6 +34289,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
             "message_type": {"type": MessageType},
             "monitor": {"type": Monitor},
             "free_running": {"type": FreeRunning},
+            "forward_v1": {"type": bool},
         }
         mode: Literal["boundary", "disabled", "e2etransparent", "gptp", "ordinarymaster", "p2ptransparent"] | None
         profile: Literal["g8275.1", "g8275.2"] | None
@@ -34317,6 +34318,8 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
         """Subclass of AvdModel."""
         free_running: FreeRunning
         """Subclass of AvdModel."""
+        forward_v1: bool | None
+        """Forward dataplane PTP V1 packets."""
 
         if TYPE_CHECKING:
 
@@ -34337,6 +34340,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                 message_type: MessageType | UndefinedType = Undefined,
                 monitor: Monitor | UndefinedType = Undefined,
                 free_running: FreeRunning | UndefinedType = Undefined,
+                forward_v1: bool | None | UndefinedType = Undefined,
             ) -> None:
                 """
                 Ptp.
@@ -34365,6 +34369,7 @@ class EosCliConfigGen(EosCliConfigGenRootModel):
                     message_type: Subclass of AvdModel.
                     monitor: Subclass of AvdModel.
                     free_running: Subclass of AvdModel.
+                    forward_v1: Forward dataplane PTP V1 packets.
 
                 """
 
