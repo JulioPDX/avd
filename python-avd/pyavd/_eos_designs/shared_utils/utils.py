@@ -137,6 +137,18 @@ class UtilsMixin(Protocol):
 
         return adapter_or_network_port_settings
 
+    def get_merged_individual_adapter_settings(
+        self: SharedUtilsProtocol, adapter_or_network_port_settings: ADAPTER_SETTINGS
+    ) -> EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem | None:
+        if not adapter_or_network_port_settings.port_channel.mode or adapter_or_network_port_settings.port_channel.lacp_fallback.mode != "individual":
+            return None
+
+        individual_adapter = adapter_or_network_port_settings.port_channel.lacp_fallback.individual._cast_as(
+            EosDesigns._DynamicKeys.DynamicConnectedEndpointsItem.ConnectedEndpointsItem.AdaptersItem
+        )
+        individual_adapter._internal_data.context = f"{adapter_or_network_port_settings._internal_data.context}.port_channel.lacp_fallback.individual"
+        return self.get_merged_adapter_settings(individual_adapter)
+
     def match_regexes(self: SharedUtilsProtocol, regexes: Iterable[str], value: str) -> bool:
         """
         Match a list of regexes with the supplied value.
