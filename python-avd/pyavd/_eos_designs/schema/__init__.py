@@ -11478,7 +11478,6 @@ class EosDesigns(EosDesignsRootModel):
                 "connected_endpoints_port_channel_interfaces": {"type": str},
                 "router_id_loopback_interface": {"type": str},
                 "vtep_loopback_interface": {"type": str},
-                "overlay_loopback_interface": {"type": str},
             }
             python_module: str | None
             """Custom Python Module to import for interface descriptions."""
@@ -11504,8 +11503,6 @@ class EosDesigns(EosDesignsRootModel):
             """Path to Custom J2 template."""
             vtep_loopback_interface: str | None
             """Path to Custom J2 template."""
-            overlay_loopback_interface: str | None
-            """Path to Custom J2 template."""
 
             if TYPE_CHECKING:
 
@@ -11522,7 +11519,6 @@ class EosDesigns(EosDesignsRootModel):
                     connected_endpoints_port_channel_interfaces: str | None | UndefinedType = Undefined,
                     router_id_loopback_interface: str | None | UndefinedType = Undefined,
                     vtep_loopback_interface: str | None | UndefinedType = Undefined,
-                    overlay_loopback_interface: str | None | UndefinedType = Undefined,
                 ) -> None:
                     """
                     InterfaceDescriptions.
@@ -11541,7 +11537,6 @@ class EosDesigns(EosDesignsRootModel):
                         connected_endpoints_port_channel_interfaces: Path to Custom J2 template.
                         router_id_loopback_interface: Path to Custom J2 template.
                         vtep_loopback_interface: Path to Custom J2 template.
-                        overlay_loopback_interface: Path to Custom J2 template.
 
                     """
 
@@ -12000,7 +11995,6 @@ class EosDesigns(EosDesignsRootModel):
                 "connected_endpoints_port_channel_interfaces": {"type": str},
                 "router_id_loopback_interface": {"type": str},
                 "vtep_loopback_interface": {"type": str},
-                "overlay_loopback_interface": {"type": str},
             }
             python_module: str | None
             """Custom Python Module to import for interface descriptions."""
@@ -12026,8 +12020,6 @@ class EosDesigns(EosDesignsRootModel):
             """Path to Custom J2 template."""
             vtep_loopback_interface: str | None
             """Path to Custom J2 template."""
-            overlay_loopback_interface: str | None
-            """Path to Custom J2 template."""
 
             if TYPE_CHECKING:
 
@@ -12044,7 +12036,6 @@ class EosDesigns(EosDesignsRootModel):
                     connected_endpoints_port_channel_interfaces: str | None | UndefinedType = Undefined,
                     router_id_loopback_interface: str | None | UndefinedType = Undefined,
                     vtep_loopback_interface: str | None | UndefinedType = Undefined,
-                    overlay_loopback_interface: str | None | UndefinedType = Undefined,
                 ) -> None:
                     """
                     InterfaceDescriptions.
@@ -12063,7 +12054,6 @@ class EosDesigns(EosDesignsRootModel):
                         connected_endpoints_port_channel_interfaces: Path to Custom J2 template.
                         router_id_loopback_interface: Path to Custom J2 template.
                         vtep_loopback_interface: Path to Custom J2 template.
-                        overlay_loopback_interface: Path to Custom J2 template.
 
                     """
 
