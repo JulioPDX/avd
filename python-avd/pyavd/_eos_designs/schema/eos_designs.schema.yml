@@ -1551,10 +1551,8 @@ keys:
             description: Interface range or interface.
         mlag_interfaces_speed:
           type: str
+          $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
           description: 'Set MLAG interfaces speed.
-
-            Speed should be set in the format `<interface_speed>` or `forced <interface_speed>`
-            or `auto <interface_speed>`.
 
             '
         downlink_interfaces:
@@ -1565,6 +1563,7 @@ keys:
             description: Interface range or interface.
         uplink_interface_speed:
           type: str
+          $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
           description: Set point-to-Point uplink interface speed.
   default_mgmt_method:
     documentation_options:
@@ -6635,8 +6634,8 @@ $defs:
     keys:
       speed:
         type: str
-        description: 'Set adapter speed in the format `<interface_speed>` or `forced
-          <interface_speed>` or `auto <interface_speed>`.
+        $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
+        description: 'Set adapter speed.
 
           If not specified speed will be auto.
 
@@ -8908,8 +8907,7 @@ $defs:
                               and documentation.
                           speed:
                             type: str
-                            description: Speed should be set in the format `<interface_speed>`
-                              or `forced <interface_speed>` or `auto <interface_speed>`.
+                            $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
                           structured_config:
                             type: dict
                             relaxed_validation: true
@@ -10019,17 +10017,16 @@ $defs:
 
               '
             type: str
+            $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
           uplink_switch_interface_speed:
             documentation_options:
               table: node-type-uplink-configuration
             description: 'Set point-to-Point interface speed for the uplink switch
               interface only.
 
-              Speed should be set in the format `<interface_speed>` or `forced <interface_speed>`
-              or `auto <interface_speed>`.
-
               '
             type: str
+            $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
           uplink_mtu:
             documentation_options:
               table: node-type-uplink-configuration
@@ -10759,11 +10756,9 @@ $defs:
               table: node-type-l2-mlag-configuration
             description: 'Set MLAG interface speed.
 
-              Speed should be set in the format `<interface_speed>` or `forced <interface_speed>`
-              or `auto <interface_speed>`.
-
               '
             type: str
+            $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
           mlag_peer_l3_vlan:
             documentation_options:
               table: node-type-l2-mlag-configuration
@@ -11873,8 +11868,7 @@ $defs:
           description: Enable or Shutdown the interface.
         speed:
           type: str
-          description: Speed should be set in the format `<interface_speed>` or `forced
-            <interface_speed>` or `auto <interface_speed>`.
+          $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
         receive_bandwidth:
           type: int
           description: 'Maximum allowed receive bandwidth (download) in Mbps for this
@@ -12091,8 +12085,7 @@ $defs:
                 description: The peer device interface. Used for description and documentation.
               speed:
                 type: str
-                description: Speed should be set in the format `<interface_speed>`
-                  or `forced <interface_speed>` or `auto <interface_speed>`.
+                $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
               rx_queue:
                 type: dict
                 $ref: eos_designs#/$defs/rx_queue_settings
@@ -12269,8 +12262,7 @@ $defs:
             '
         speed:
           type: str
-          description: Speed should be set in the format `<interface_speed>` or `forced
-            <interface_speed>` or `auto <interface_speed>`.
+          $ref: eos_cli_config_gen#/keys/ethernet_interfaces/items/keys/speed
         ip_pool:
           type: str
           description: P2P pool name. IP Pool defined under p2p_links_ip_pools. A
