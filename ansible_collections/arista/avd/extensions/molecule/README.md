@@ -68,7 +68,7 @@ Testing for `eos_cli_config_gen` is part of [scenario `eos_cli_config_gen`](./eo
 - Loopback Interfaces defined in [host_vars/loopback-interfaces](./eos_cli_config_gen/inventory/host_vars/loopbacks-interfaces.yml)
 - Vlans defined in [host_vars/vlans](./eos_cli_config_gen/inventory/host_vars/vlans.yml)
 
-When you update a template in `eos_cli_config_gen`, you should report a test case in molecule scenario [`ansible_collections/arista/avd/molecule/eos_cli_config_gen`](./eos_cli_config_gen/).
+When you update a template in `eos_cli_config_gen`, you should report a test case in molecule scenario [`ansible_collections/arista/avd/extensions/molecule/eos_cli_config_gen`](./eos_cli_config_gen/).
 
 1. Create or update a file related to updated section under `inventory/host_vars`
 
