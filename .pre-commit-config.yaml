@@ -11,11 +11,19 @@ repos:
     hooks:
       - id: trailing-whitespace
         name: Trims trailing whitespace.
-        exclude: ansible_collections/arista/avd/extensions/molecule
+        exclude: >
+          (?x)(
+            ansible_collections/arista/avd/extensions/molecule|
+            \.excalidraw$
+          )
       - id: end-of-file-fixer
         name: Ensures that a file is either empty, or ends with one newline.
         exclude_types: [svg, json]
-        exclude: ansible_collections/arista/avd/extensions/molecule
+        exclude: >
+          (?x)(
+            ansible_collections/arista/avd/extensions/molecule|
+            \.excalidraw$
+          )
       - id: check-added-large-files
         name: Prevents giant files from being committed.
         exclude: >-
