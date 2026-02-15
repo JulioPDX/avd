@@ -1,0 +1,3 @@
+galaxy_info:
+  description: Deploy AVD structured configurations to NetBox
+  standalone: false

@@ -1,0 +1,41 @@
+# Roles Defaults - main
+
+avd_structured_config_file_format: "yml"
+
+# NetBox server configuration
+# netbox_url: <str>  # Required - URL of the NetBox instance
+# netbox_token: <str>  # Required - NetBox API token (use Ansible Vault)
+# netbox_site_name: <str>  # Required - Site name in NetBox
+
+# Verify SSL certificates when connecting to NetBox.
+# Set to false for self-signed certificates in test environments.
+netbox_verify_ssl: true
+
+# HTTP timeout in seconds for NetBox API calls.
+netbox_timeout: 30.0
+
+# Automatically create prerequisite objects in NetBox (site, device types,
+# device roles, manufacturers, platforms) if they don't exist.
+netbox_create_prerequisites: true
+
+# If true, no changes will be made to NetBox. The role will report what
+# would be created or updated.
+netbox_dry_run: false
+
+# Sync these devices to NetBox.
+# Defaults to all devices found in the structured_config directory.
+# netbox_devices:
+#   - device1
+#   - device2
+
+# Optional explicit mapping of device hostname to node type.
+# If not provided, node types are inferred from hostname patterns.
+# Valid node types: spine, l3leaf, l2leaf, l2spine, l3spine, p, pe, rr, wan_rr, wan_router
+# netbox_node_type_mapping:
+#   dc1-spine1: spine
+#   dc1-leaf1a: l3leaf
+#   dc1-leaf1c: l2leaf
+
+# If true, detailed results will be registered into 'netbox_deploy_results' variable.
+# Otherwise only basic results like created, updated, skipped, errors are registered.
+netbox_return_details: false

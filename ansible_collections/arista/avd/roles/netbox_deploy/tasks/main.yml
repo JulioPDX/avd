@@ -1,0 +1,32 @@
+# Copyright (c) 2026 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the LICENSE file.
+---
+- name: Verify Requirements
+  delegate_to: localhost
+  when: avd_requirements is not defined and avd_verify_requirements | default(true)
+  arista.avd.verify_requirements:
+    requirements: "{{ lookup('file', requirements_path ~ '/requirements.txt').splitlines() }}"
+    avd_ignore_requirements: "{{ avd_ignore_requirements | default(false) }}"
+  vars:
+    requirements_path: "{{ (role_path | split('/'))[0:-2] | join('/') }}"
+  run_once: true
+  register: avd_requirements
+
+- name: Deploy AVD structured configs to NetBox
+  run_once: true
+  delegate_to: localhost
+  arista.avd.netbox_deploy:
+    netbox_url: "{{ netbox_url }}"
+    netbox_token: "{{ netbox_token }}"
+    site_name: "{{ netbox_site_name }}"
+    structured_config_dir: "{{ structured_dir }}"
+    structured_config_suffix: "{{ avd_structured_config_file_format }}"
+    device_list: "{{ netbox_devices | arista.avd.default(omit) }}"
+    node_type_mapping: "{{ netbox_node_type_mapping | arista.avd.default(omit) }}"
+    verify_ssl: "{{ netbox_verify_ssl }}"
+    timeout: "{{ netbox_timeout }}"
+    create_prerequisites: "{{ netbox_create_prerequisites }}"
+    dry_run: "{{ netbox_dry_run }}"
+    return_details: "{{ netbox_return_details }}"
+  register: netbox_deploy_results

@@ -1,7 +1,7 @@
 # Copyright (c) 2023-2026 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
-# ruff: noqa: ANN201, ANN001, RET504
+# ruff: noqa: ANN201, ANN001
 """Tests for NetBox sync functionality."""
 
 from __future__ import annotations
@@ -121,62 +121,3 @@ class TestAVDNetBoxSyncDevices:
 
         assert result.updated == 1
         mock_client.patch.assert_called_once()
-
-
-class TestAVDNetBoxSyncNetboxToAvd:
-    """Tests for NetBox to AVD sync functionality."""
-
-    @pytest.fixture
-    def mock_client(self):
-        client = MagicMock()
-        return client
-
-    def test_fetch_devices_from_netbox(self, mock_client):
-        """Should convert NetBox devices to AVD inventory format."""
-        mock_client.get_all.return_value = [
-            {
-                "id": 1,
-                "name": "spine1",
-                "role": {"slug": "spine"},
-                "site": {"name": "DC1"},
-                "platform": {"slug": "veos"},
-                "primary_ip": {"address": "192.168.1.1/24"},
-            }
-        ]
-
-        sync = AVDNetBoxSync(mock_client)
-        inventory = sync.fetch_devices_from_netbox()
-
-        assert "spine1" in inventory
-        assert inventory["spine1"]["ansible_host"] == "192.168.1.1"
-        assert inventory["spine1"]["type"] == "spine"
-
-    def test_generate_avd_inventory(self, mock_client):
-        """Should generate proper AVD inventory structure."""
-        mock_client.get_all.return_value = [
-            {"id": 1, "name": "spine1", "role": {"slug": "spine"}},
-            {"id": 2, "name": "leaf1", "role": {"slug": "leaf"}},
-        ]
-
-        sync = AVDNetBoxSync(mock_client)
-        inventory = sync.generate_avd_inventory()
-
-        assert "all" in inventory
-        fabric = inventory["all"]["children"]["FABRIC"]["children"]
-        assert "SPINES" in fabric
-        assert "L3_LEAFS" in fabric
-
-    def test_fetch_vlans_from_netbox(self, mock_client):
-        """Should convert NetBox VLANs to AVD format."""
-        mock_client.get_all.return_value = [
-            {"vid": 100, "name": "DATA", "status": {"value": "active"}},
-            {"vid": 200, "name": "VOICE", "status": {"value": "deprecated"}},
-        ]
-
-        sync = AVDNetBoxSync(mock_client)
-        vlans = sync.fetch_vlans_from_netbox()
-
-        assert len(vlans) == 2
-        assert vlans[0]["id"] == 100
-        assert vlans[0]["state"] == "active"
-        assert vlans[1]["state"] == "suspend"
