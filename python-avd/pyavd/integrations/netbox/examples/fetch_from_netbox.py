@@ -10,7 +10,11 @@ from NetBox to bootstrap or update an AVD deployment.
 
 Usage:
     python fetch_from_netbox.py --netbox-url https://netbox.example.com \
-        --token nbt_xxx.yyy --site DC1 --output inventory.yml
+        --token nbt_xxx.yyy --site dc1 --output inventory.yml
+
+    # Generate complete AVD group_vars from NetBox
+    python fetch_from_netbox.py --netbox-url https://netbox.example.com \
+        --token nbt_xxx.yyy --site dc1 --generate-group-vars --output group_vars.yml
 """
 
 from __future__ import annotations
@@ -32,11 +36,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch data from NetBox for AVD")
     parser.add_argument("--netbox-url", required=True, help="NetBox URL")
     parser.add_argument("--token", required=True, help="NetBox API token")
-    parser.add_argument("--site", help="NetBox site filter")
+    parser.add_argument("--site", help="NetBox site filter (use slug, e.g., 'dc1')")
     parser.add_argument("--output", "-o", default="inventory.yml", help="Output file")
     parser.add_argument("--fetch-vlans", action="store_true", help="Also fetch VLANs")
     parser.add_argument("--fetch-vrfs", action="store_true", help="Also fetch VRFs")
     parser.add_argument("--fetch-prefixes", action="store_true", help="Also fetch prefixes")
+    parser.add_argument("--fetch-cables", action="store_true", help="Also fetch cable connections")
+    parser.add_argument("--fetch-ips", action="store_true", help="Also fetch IP addresses")
+    parser.add_argument(
+        "--generate-group-vars",
+        action="store_true",
+        help="Generate complete AVD group_vars (includes topology, VLANs, VRFs)",
+    )
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
@@ -52,16 +63,55 @@ def main() -> None:
     with NetBoxClient(args.netbox_url, args.token) as client:
         sync = AVDNetBoxSync(client)
 
+        # Generate complete group_vars if requested
+        if args.generate_group_vars:
+            print(f"Generating AVD group_vars from NetBox{f' (site: {args.site})' if args.site else ''}...")
+            group_vars = sync.generate_avd_group_vars(args.site)
+
+            # Count items
+            spines_data = group_vars.get("SPINES", {})
+            l3leafs_data = group_vars.get("L3_LEAFS", {})
+            l2leafs_data = group_vars.get("L2_LEAFS") or {}
+            network_services = group_vars.get("NETWORK_SERVICES", {})
+
+            spine_count = len(spines_data.get("spine", {}).get("nodes", []))
+            l3leaf_groups = len(l3leafs_data.get("l3leaf", {}).get("node_groups", []))
+            l2leaf_groups = len(l2leafs_data.get("l2leaf", {}).get("node_groups", [])) if l2leafs_data else 0
+            tenants = len(network_services.get("tenants", []))
+
+            print(f"Generated group_vars: {spine_count} spines, {l3leaf_groups} L3 leaf groups, {l2leaf_groups} L2 leaf groups, {tenants} tenants")
+
+            # Write output files
+            output_dir = Path(args.output).parent
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            # Write each group_vars file
+            files_written = []
+            for group_name, data in group_vars.items():
+                if data is None:
+                    continue
+                output_path = output_dir / f"{group_name}.yml"
+                with output_path.open("w") as f:
+                    f.write("---\n")
+                    yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+                files_written.append(str(output_path))
+
+            print("\nGroup vars written to:")
+            for fpath in files_written:
+                print(f"  - {fpath}")
+            return
+
         # Fetch device inventory
         print(f"Fetching devices from NetBox{f' (site: {args.site})' if args.site else ''}...")
         inventory = sync.generate_avd_inventory(args.site)
 
         # Count devices
-        device_count = sum(len(group.get("hosts", {})) for group in inventory.get("all", {}).get("children", {}).get("FABRIC", {}).get("children", {}).values())
+        fabric_children = inventory.get("all", {}).get("children", {}).get("FABRIC", {}).get("children", {})
+        device_count = sum(len(group.get("hosts", {})) for group in fabric_children.values())
         print(f"Found {device_count} devices")
 
         # Fetch additional data if requested
-        extra_data = {}
+        extra_data: dict = {}
 
         if args.fetch_vlans:
             print("Fetching VLANs...")
@@ -80,6 +130,18 @@ def main() -> None:
             prefixes = sync.fetch_prefixes_from_netbox()
             extra_data["prefixes"] = prefixes
             print(f"Found {len(prefixes)} prefixes")
+
+        if args.fetch_cables:
+            print("Fetching cables...")
+            cables = sync.fetch_cables_from_netbox(args.site)
+            extra_data["cables"] = cables
+            print(f"Found {len(cables)} cable connections")
+
+        if args.fetch_ips:
+            print("Fetching IP addresses...")
+            ips = sync.fetch_ip_addresses_from_netbox(args.site)
+            extra_data["ip_addresses"] = ips
+            print(f"Found {len(ips)} IP addresses")
 
         # Combine inventory with extra data
         output_data = {
