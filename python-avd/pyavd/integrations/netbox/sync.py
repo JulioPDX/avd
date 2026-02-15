@@ -30,6 +30,39 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_MANUFACTURER = {"name": "Arista", "slug": "arista"}
 DEFAULT_DEVICE_TYPE = {"model": "vEOS", "slug": "veos"}
 
+# AVD node type categories for topology detection
+SPINE_TYPES = {"spine", "l2spine", "l3spine", "super_spine"}
+LEAF_TYPES = {"l3leaf", "l2leaf", "leaf"}
+MPLS_TYPES = {"p", "pe", "rr"}
+WAN_TYPES = {"wan_rr", "wan_router"}
+ALL_NODE_TYPES = SPINE_TYPES | LEAF_TYPES | MPLS_TYPES | WAN_TYPES
+
+# Underlay protocol detection from NetBox tags or device role patterns
+UNDERLAY_PROTOCOL_MAP = {
+    "isis": "isis",
+    "ospf": "ospf",
+    "ebgp": "ebgp",
+    "ibgp": "ibgp",
+    "none": "none",  # L2LS fabrics with no underlay routing
+}
+
+# Default interface patterns for different topologies
+DEFAULT_INTERFACE_PATTERNS = {
+    "l3ls": {
+        "spine": {"uplink_interfaces": ["Ethernet1-2"], "downlink_interfaces": ["Ethernet1-8"]},
+        "l3leaf": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet3-4"], "downlink_interfaces": ["Ethernet8"]},
+        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
+    },
+    "l2ls": {
+        "l2spine": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet47-48"], "downlink_interfaces": ["Ethernet1-8"]},
+        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
+    },
+    "campus": {
+        "l3spine": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet47-48"], "downlink_interfaces": ["Ethernet1-8"]},
+        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
+    },
+}
+
 
 @dataclass
 class SyncResult:
@@ -147,6 +180,48 @@ class AVDNetBoxSync:
             return result["results"][0]
         return None
 
+    def _infer_node_type_from_hostname(self, hostname: str) -> str | None:
+        """
+        Infer AVD node type from hostname patterns.
+
+        Common patterns:
+        - *spine* -> spine (or l2spine/l3spine variants)
+        - *leaf*[0-9][a-b] -> l3leaf (paired leafs)
+        - *leaf*[0-9]c -> l2leaf (standalone leafs)
+        - *pe*, *rr*, p[0-9]* -> MPLS types
+        - *wan* -> WAN types
+        """
+        hostname_lower = hostname.lower()
+        node_type: str | None = None
+
+        # Check for spine patterns
+        if "spine" in hostname_lower:
+            if "l2spine" in hostname_lower or "l2-spine" in hostname_lower:
+                node_type = "l2spine"
+            elif "l3spine" in hostname_lower or "l3-spine" in hostname_lower:
+                node_type = "l3spine"
+            else:
+                node_type = "spine"
+        # Check for leaf patterns
+        elif "leaf" in hostname_lower:
+            # L2 leafs often end with 'c' (e.g., dc1-leaf1c)
+            node_type = "l2leaf" if hostname_lower.endswith("c") else "l3leaf"
+        # Check for MPLS node types
+        elif "-pe" in hostname_lower or hostname_lower.startswith("pe"):
+            node_type = "pe"
+        elif "-rr" in hostname_lower or hostname_lower.startswith("rr"):
+            node_type = "rr"
+        # P router - careful not to match other names
+        elif hostname_lower.startswith("p") and len(hostname_lower) >= 2 and hostname_lower[1].isdigit():
+            node_type = "p"
+        # Check for WAN types
+        elif "wan-rr" in hostname_lower or "wan_rr" in hostname_lower:
+            node_type = "wan_rr"
+        elif "wan" in hostname_lower:
+            node_type = "wan_router"
+
+        return node_type
+
     def _transform_avd_to_netbox(
         self,
         avd_data: dict[str, Any],
@@ -210,12 +285,25 @@ class AVDNetBoxSync:
                     LOGGER.debug("Platform '%s' not found in NetBox, skipping platform assignment", platform_slug)
 
         # Add device role from node type - need to look up the role ID
+        # If node_type not provided, try to infer from hostname
+        if not node_type:
+            node_type = self._infer_node_type_from_hostname(hostname)
+
         if node_type:
             role_slug = NODE_TYPE_TO_DEVICE_ROLE.get(node_type)
             if role_slug:
                 role = self._find_netbox_object(endpoints["device_roles"], slug=role_slug)
                 if role:
                     netbox_data["role"] = role["id"]
+
+        # If still no role, use a default role to avoid NetBox 400 error
+        if "role" not in netbox_data:
+            # Try to use "leaf" as default since it's the most common
+            role = self._find_netbox_object(endpoints["device_roles"], slug="leaf")
+            if role:
+                netbox_data["role"] = role["id"]
+            else:
+                LOGGER.warning("No device role found for %s, device creation may fail", hostname)
 
         # Set device status to active (NetBox default status values)
         netbox_data["status"] = "active"
@@ -922,6 +1010,14 @@ class AVDNetBoxSync:
         if device_name:
             params["device"] = device_name
 
+        # Build a set of valid device names for site filtering
+        # The IP address API doesn't include device.site in assigned_object.device,
+        # so we need to fetch device list separately for site-based filtering
+        valid_devices: set[str] | None = None
+        if site_name and not device_name:
+            site_devices = self.fetch_devices_from_netbox(site_name)
+            valid_devices = set(site_devices.keys())
+
         ip_addresses: list[dict[str, Any]] = []
 
         for ip in self.client.get_all(endpoints["ip_addresses"], params):
@@ -930,16 +1026,16 @@ class AVDNetBoxSync:
                 continue
 
             device = assigned_obj.get("device", {})
-            device_site = device.get("site", {}).get("slug") if device.get("site") else None
+            device_name_from_ip = device.get("name") if device else None
 
-            # Filter by site if specified
-            if site_name and device_site != site_name:
+            # Filter by site using the pre-fetched device list
+            if valid_devices is not None and device_name_from_ip not in valid_devices:
                 continue
 
             ip_addresses.append(
                 {
                     "address": ip.get("address"),
-                    "device": device.get("name") if device else None,
+                    "device": device_name_from_ip,
                     "interface": assigned_obj.get("name"),
                     "vrf": ip.get("vrf", {}).get("name") if ip.get("vrf") else None,
                     "status": ip.get("status", {}).get("value"),
@@ -1050,76 +1146,206 @@ class AVDNetBoxSync:
 
         return mlag_peers
 
-    def generate_avd_group_vars(self, site_name: str | None = None) -> dict[str, Any]:
+    def _detect_topology_type(
+        self,
+        devices: dict[str, dict[str, Any]],
+        ip_addresses: list[dict[str, Any]] | None = None,
+    ) -> str:
         """
-        Generate complete AVD group_vars from NetBox data.
+        Detect the AVD topology type from device types and interface data in NetBox.
 
-        This creates fabric variables, node type defaults, and network services
-        suitable for populating AVD group_vars files.
+        The detection is based on:
+        1. Explicit device role types (l2spine, l3spine, p, pe, rr, wan_*)
+        2. Presence of loopback interfaces (L3LS has loopbacks, L2LS doesn't)
+        3. Network characteristics (IP addresses on interfaces)
 
-        The generated structure follows AVD eos_designs schema requirements:
-        - Separate files for spines, l3leafs, l2leafs, and network_services
-        - All required fields for schema validation (uplink_interfaces, mlag_interfaces, bgp_as)
-        - Proper node type classification
-
-        Args:
-            site_name: NetBox site to fetch data from (slug format)
-
-        Returns:
-            Dict with AVD group_vars structure, organized by file type
+        Returns one of: 'l3ls', 'l2ls', 'campus', 'mpls', 'wan', 'mixed'
         """
-        # Fetch all required data
-        devices = self.fetch_devices_from_netbox(site_name)
-        connections = self.fetch_cables_from_netbox(site_name)
-        vlans = self.fetch_vlans_from_netbox(site_name)
-        vrfs = self.fetch_vrfs_from_netbox()
-        ip_addresses = self.fetch_ip_addresses_from_netbox(site_name)
+        device_types = {d.get("type") for d in devices.values() if d.get("type")}
 
-        # Build topology from connections
-        uplinks = self._build_uplink_topology(connections, devices)
-        mlag_peers = self._build_mlag_topology(connections, devices)
+        # Check for MPLS/ISIS topology (p, pe, rr)
+        if device_types & MPLS_TYPES:
+            return "mpls"
 
-        # Group devices by type - distinguish between l3leaf and l2leaf
-        spines = {h: d for h, d in devices.items() if d.get("type") == "spine"}
-        l3leafs: dict[str, dict[str, Any]] = {}
-        l2leafs: dict[str, dict[str, Any]] = {}
+        # Check for WAN/SD-WAN topology
+        if device_types & WAN_TYPES:
+            return "wan"
+
+        # Check for explicit L2LS device types
+        if "l2spine" in device_types and "l3leaf" not in device_types:
+            return "l2ls"
+
+        # Check for Campus topology (l3spine)
+        if "l3spine" in device_types:
+            return "campus"
+
+        # For spine/leaf topologies, check for loopback interfaces to distinguish L2LS from L3LS
+        # L2LS fabrics have NO loopback interfaces (just MLAG VLAN interfaces)
+        # L3LS fabrics have loopback interfaces for VTEP and router-id
+        if ip_addresses is not None:
+            # Check if any device has a Loopback interface with an IP
+            has_loopback_ips = any(ip.get("interface", "").startswith("Loopback") for ip in ip_addresses)
+            # If no loopback IPs and we have spines + leaves, it's L2LS
+            if not has_loopback_ips and "spine" in device_types and "leaf" in device_types:
+                return "l2ls"
+
+        # Default to L3LS (spine, l3leaf, l2leaf)
+        return "l3ls"
+
+    def _detect_underlay_protocol(self, topology_type: str) -> str:
+        """
+        Detect underlay routing protocol from topology type.
+
+        Falls back to sensible defaults based on topology type.
+        """
+        protocol_defaults = {
+            "l3ls": "ebgp",
+            "l2ls": "none",  # L2LS has no underlay routing
+            "campus": "ospf",
+            "mpls": "isis",
+            "wan": "none",  # WAN uses different model
+        }
+        return protocol_defaults.get(topology_type, "ebgp")
+
+    def _group_devices_by_type(
+        self,
+        devices: dict[str, dict[str, Any]],
+        uplinks: dict[str, dict[str, Any]],
+        topology_type: str = "l3ls",
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """
+        Group devices by their AVD node type.
+
+        For L2LS topologies, spines are reclassified as l2spine and leaves as l2leaf.
+
+        Returns a dict with keys for each node type category.
+        """
+        grouped: dict[str, dict[str, dict[str, Any]]] = {
+            "spine": {},
+            "l2spine": {},
+            "l3spine": {},
+            "l3leaf": {},
+            "l2leaf": {},
+            "p": {},
+            "pe": {},
+            "rr": {},
+            "wan_rr": {},
+            "wan_router": {},
+            "super_spine": {},
+        }
 
         for hostname, device in devices.items():
             device_type = device.get("type", "")
-            # Check if it's an L2 leaf (standalone, no MLAG pair, typically "c" suffix)
-            if device_type in ("leaf", "l3leaf"):
-                # Check if this device has uplinks to other leafs (L2 leaf pattern)
+
+            # For L2LS topology, reclassify spine -> l2spine, leaf -> l2leaf
+            if topology_type == "l2ls":
+                if device_type == "spine":
+                    grouped["l2spine"][hostname] = device
+                elif device_type in ("leaf", "l3leaf", "l2leaf"):
+                    grouped["l2leaf"][hostname] = device
+                continue
+
+            if device_type == "spine":
+                grouped["spine"][hostname] = device
+            elif device_type == "l2spine":
+                grouped["l2spine"][hostname] = device
+            elif device_type == "l3spine":
+                grouped["l3spine"][hostname] = device
+            elif device_type in ("leaf", "l3leaf"):
+                # Determine if L3 or L2 leaf based on uplinks
                 uplink_info = uplinks.get(hostname, {})
                 uplink_switches = uplink_info.get("uplink_switches", [])
-                # If uplinks go to leafs, it's an L2 leaf
+                # If uplinks go to other leafs (not spines), it's an L2 leaf
                 is_l2_leaf = any(sw in devices and devices[sw].get("type") in ("leaf", "l3leaf") for sw in uplink_switches)
                 if is_l2_leaf:
-                    l2leafs[hostname] = device
+                    grouped["l2leaf"][hostname] = device
                 else:
-                    l3leafs[hostname] = device
+                    grouped["l3leaf"][hostname] = device
             elif device_type == "l2leaf":
-                l2leafs[hostname] = device
+                grouped["l2leaf"][hostname] = device
+            elif device_type == "p":
+                grouped["p"][hostname] = device
+            elif device_type == "pe":
+                grouped["pe"][hostname] = device
+            elif device_type == "rr":
+                grouped["rr"][hostname] = device
+            elif device_type == "wan_rr":
+                grouped["wan_rr"][hostname] = device
+            elif device_type == "wan_router":
+                grouped["wan_router"][hostname] = device
+            elif device_type == "super_spine":
+                grouped["super_spine"][hostname] = device
 
-        # Build IP address lookup by device/interface
-        ip_lookup: dict[str, dict[str, str]] = {}
-        for ip in ip_addresses:
-            device = ip.get("device")
-            interface = ip.get("interface")
-            if device and interface:
-                if device not in ip_lookup:
-                    ip_lookup[device] = {}
-                ip_lookup[device][interface] = ip.get("address", "")
+        return grouped
 
-        # Build fabric name from site
-        fabric_name = f"{site_name.upper()}_FABRIC" if site_name else "FABRIC"
+    def _build_core_interfaces(
+        self,
+        connections: list[dict[str, Any]],
+        devices: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """
+        Build core_interfaces/p2p_links structure for MPLS/mesh topologies.
 
-        # Generate FABRIC variables
-        fabric_vars: dict[str, Any] = {
-            "fabric_name": fabric_name,
-            "underlay_routing_protocol": "ebgp",
-            "overlay_routing_protocol": "ebgp",
-            "p2p_uplinks_mtu": 1500,
-            "default_interfaces": [
+        This is used for topologies where the standard uplink/downlink model doesn't apply.
+        """
+        core_interfaces: dict[str, Any] = {
+            "p2p_links_ip_pools": [{"name": "core_pool", "ipv4_pool": "10.255.3.0/24"}],
+            "p2p_links_profiles": [
+                {
+                    "name": "core_profile",
+                    "mtu": 1500,
+                    "isis_metric": 50,
+                    "ip_pool": "core_pool",
+                    "isis_circuit_type": "level-2",
+                    "isis_authentication_mode": "md5",
+                    "isis_authentication_key": "$1c$sTNAlR6rKSw=",
+                }
+            ],
+            "p2p_links": [],
+        }
+
+        # Build p2p_links from cable connections
+        link_id = 1
+        seen_links: set[tuple[str, str]] = set()
+
+        for conn in connections:
+            a_device = conn["a_device"]
+            b_device = conn["b_device"]
+            a_interface = conn["a_interface"]
+            b_interface = conn["b_interface"]
+
+            # Skip if not both MPLS devices
+            if a_device not in devices or b_device not in devices:
+                continue
+
+            a_type = devices[a_device].get("type", "")
+            b_type = devices[b_device].get("type", "")
+
+            if a_type not in MPLS_TYPES or b_type not in MPLS_TYPES:
+                continue
+
+            # Avoid duplicate links
+            link_key = tuple(sorted([a_device, b_device]))
+            if link_key in seen_links:
+                continue
+            seen_links.add(link_key)
+
+            core_interfaces["p2p_links"].append(
+                {
+                    "nodes": [a_device, b_device],
+                    "id": link_id,
+                    "interfaces": [a_interface, b_interface],
+                    "profile": "core_profile",
+                }
+            )
+            link_id += 1
+
+        return core_interfaces
+
+    def _generate_default_interfaces(self, topology_type: str) -> list[dict[str, Any]]:
+        """Generate default_interfaces based on topology type."""
+        if topology_type == "l3ls":
+            return [
                 {
                     "types": ["spine"],
                     "platforms": ["default"],
@@ -1138,40 +1364,206 @@ class AVDNetBoxSync:
                     "platforms": ["default"],
                     "uplink_interfaces": ["Ethernet1-2"],
                 },
-            ],
-        }
+            ]
+        if topology_type == "l2ls":
+            return [
+                {
+                    "types": ["l2spine"],
+                    "platforms": ["default"],
+                    "uplink_interfaces": ["Ethernet1-2"],
+                    "mlag_interfaces": ["Ethernet47-48"],
+                    "downlink_interfaces": ["Ethernet1-8"],
+                },
+                {
+                    "types": ["l2leaf"],
+                    "platforms": ["default"],
+                    "uplink_interfaces": ["Ethernet1-2"],
+                },
+            ]
+        if topology_type == "campus":
+            return [
+                {
+                    "types": ["l3spine"],
+                    "platforms": ["default"],
+                    "uplink_interfaces": ["Ethernet1-2"],
+                    "mlag_interfaces": ["Ethernet47-48"],
+                    "downlink_interfaces": ["Ethernet1-8"],
+                },
+                {
+                    "types": ["l2leaf"],
+                    "platforms": ["default"],
+                    "uplink_interfaces": ["Ethernet1-2"],
+                },
+            ]
+        # MPLS/WAN don't use default_interfaces
+        return []
 
-        # Generate SPINES group_vars
-        spines_vars: dict[str, Any] = {
-            "type": "spine",
-            "spine": {
+    def _get_mgmt_ip(self, hostname: str, ip_lookup: dict[str, dict[str, str]]) -> str | None:
+        """Get management IP for a device from IP lookup."""
+        if hostname in ip_lookup:
+            return ip_lookup[hostname].get("Management1") or ip_lookup[hostname].get("Management0")
+        return None
+
+    def _generate_spine_group_vars(
+        self,
+        spines: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        node_type: str,
+        bgp_as: int = 65100,
+    ) -> dict[str, Any]:
+        """Generate group_vars for spine node type."""
+        result: dict[str, Any] = {
+            "type": node_type,
+            node_type: {
                 "defaults": {
                     "platform": "vEOS-lab",
                     "loopback_ipv4_pool": "10.255.0.0/27",
-                    "bgp_as": 65100,
+                    "bgp_as": bgp_as,
                 },
                 "nodes": [],
             },
         }
-
         for idx, hostname in enumerate(sorted(spines.keys()), 1):
             node: dict[str, Any] = {"name": hostname, "id": idx}
-            if hostname in ip_lookup:
-                mgmt_ip = ip_lookup[hostname].get("Management1") or ip_lookup[hostname].get("Management0")
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result[node_type]["nodes"].append(node)
+        return result
+
+    def _generate_l2spine_group_vars(
+        self,
+        l2spines: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        mlag_peers: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for l2spine node type (L2LS fabric)."""
+        result: dict[str, Any] = {
+            "type": "l2spine",
+            "l2spine": {
+                "defaults": {
+                    "platform": "cEOSLab",
+                    "spanning_tree_mode": "mstp",
+                    "spanning_tree_priority": 4096,
+                    "mlag_peer_ipv4_pool": "192.168.0.0/24",
+                    "mlag_interfaces": ["Ethernet47", "Ethernet48"],
+                },
+                "node_groups": [],
+            },
+        }
+        # Group l2spines by MLAG pairs
+        node_groups, _ = self._group_nodes_by_mlag(l2spines, ip_lookup, mlag_peers, "SPINES")
+        result["l2spine"]["node_groups"] = node_groups
+        return result
+
+    def _generate_l3spine_group_vars(
+        self,
+        l3spines: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        mlag_peers: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for l3spine node type (Campus fabric)."""
+        result: dict[str, Any] = {
+            "type": "l3spine",
+            "l3spine": {
+                "defaults": {
+                    "platform": "cEOSLab",
+                    "loopback_ipv4_pool": "10.255.0.0/27",
+                    "mlag_peer_ipv4_pool": "192.168.0.0/24",
+                    "mlag_interfaces": ["Ethernet47", "Ethernet48"],
+                },
+                "node_groups": [],
+            },
+        }
+        # Group l3spines by MLAG pairs
+        node_groups, _ = self._group_nodes_by_mlag(l3spines, ip_lookup, mlag_peers, "SPINES")
+        result["l3spine"]["node_groups"] = node_groups
+        return result
+
+    def _group_nodes_by_mlag(
+        self,
+        devices: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        mlag_peers: dict[str, dict[str, Any]],
+        group_prefix: str,
+        start_id: int = 1,
+        start_bgp_as: int | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """
+        Group nodes by MLAG pairs and generate node_groups structure.
+
+        Returns:
+            Tuple of (node_groups list, next_id to use)
+        """
+        processed: set[str] = set()
+        node_groups: list[dict[str, Any]] = []
+        global_id = start_id
+        bgp_as_counter = start_bgp_as or 65101
+        group_counter = 1
+
+        for hostname in sorted(devices.keys()):
+            if hostname in processed:
+                continue
+
+            mlag_info = mlag_peers.get(hostname, {})
+            peer = mlag_info.get("mlag_peer")
+
+            if peer and peer in devices:
+                # MLAG pair
+                group_name = f"{group_prefix}_{group_counter}" if group_counter > 1 else group_prefix
+                node_group: dict[str, Any] = {"group": group_name, "nodes": []}
+                if start_bgp_as:
+                    node_group["bgp_as"] = bgp_as_counter
+                    bgp_as_counter += 1
+
+                for node_name in [hostname, peer]:
+                    node: dict[str, Any] = {"name": node_name, "id": global_id}
+                    global_id += 1
+                    mgmt_ip = self._get_mgmt_ip(node_name, ip_lookup)
+                    if mgmt_ip:
+                        node["mgmt_ip"] = mgmt_ip
+                    node_group["nodes"].append(node)
+                    processed.add(node_name)
+
+                node_groups.append(node_group)
+                group_counter += 1
+            else:
+                # Standalone node
+                node: dict[str, Any] = {"name": hostname, "id": global_id}
+                global_id += 1
+                mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
                 if mgmt_ip:
                     node["mgmt_ip"] = mgmt_ip
-            spines_vars["spine"]["nodes"].append(node)
 
-        # Generate L3_LEAFS group_vars
-        l3leafs_vars: dict[str, Any] = {
+                group_name = hostname.replace("-", "_").upper()
+                standalone_group: dict[str, Any] = {"group": group_name, "nodes": [node]}
+                if start_bgp_as:
+                    standalone_group["bgp_as"] = bgp_as_counter
+                    bgp_as_counter += 1
+                node_groups.append(standalone_group)
+                processed.add(hostname)
+                group_counter += 1
+
+        return node_groups, global_id
+
+    def _generate_l3leaf_group_vars(
+        self,
+        l3leafs: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        mlag_peers: dict[str, dict[str, Any]],
+        uplink_switches: list[str],
+        loopback_offset: int,
+    ) -> dict[str, Any]:
+        """Generate group_vars for l3leaf node type."""
+        result: dict[str, Any] = {
             "type": "l3leaf",
             "l3leaf": {
                 "defaults": {
                     "platform": "vEOS-lab",
                     "loopback_ipv4_pool": "10.255.0.0/27",
-                    "loopback_ipv4_offset": len(spines),  # Offset to avoid spine IPs
+                    "loopback_ipv4_offset": loopback_offset,
                     "vtep_loopback_ipv4_pool": "10.255.1.0/27",
-                    "uplink_switches": sorted(spines.keys()),
+                    "uplink_switches": uplink_switches,
                     "uplink_ipv4_pool": "10.255.255.0/26",
                     "mlag_peer_ipv4_pool": "10.255.1.64/27",
                     "mlag_peer_l3_ipv4_pool": "10.255.1.96/27",
@@ -1182,112 +1574,331 @@ class AVDNetBoxSync:
                 "node_groups": [],
             },
         }
+        # Use _group_nodes_by_mlag with BGP AS assignment
+        node_groups, _ = self._group_nodes_by_mlag(l3leafs, ip_lookup, mlag_peers, "DC1_L3_LEAF", start_id=1, start_bgp_as=65101)
+        result["l3leaf"]["node_groups"] = node_groups
+        return result
 
-        # Group l3leafs by MLAG pairs
-        # NOTE: IDs must be globally unique across all node_groups, not just within each group.
-        # AVD uses the leaf ID to calculate spine downlink interfaces from the default_interfaces pool.
-        processed_leafs: set[str] = set()
-        l3leaf_node_groups: list[dict[str, Any]] = []
-        bgp_as_counter = 65101  # Start BGP AS for leafs
-        global_leaf_id = 1  # Global ID counter for spine downlink interface calculation
-
-        for hostname in sorted(l3leafs.keys()):
-            if hostname in processed_leafs:
-                continue
-
-            mlag_info = mlag_peers.get(hostname, {})
-            peer = mlag_info.get("mlag_peer")
-
-            if peer and peer in l3leafs:
-                # MLAG pair - create node_group with bgp_as
-                group_name = f"DC1_L3_LEAF{(bgp_as_counter - 65100)}"
-                node_group: dict[str, Any] = {
-                    "group": group_name,
-                    "bgp_as": bgp_as_counter,
-                    "nodes": [],
-                }
-                bgp_as_counter += 1
-
-                for leaf_name in [hostname, peer]:
-                    node: dict[str, Any] = {"name": leaf_name, "id": global_leaf_id}
-                    global_leaf_id += 1
-
-                    # Add management IP
-                    if leaf_name in ip_lookup:
-                        mgmt_ip = ip_lookup[leaf_name].get("Management1") or ip_lookup[leaf_name].get("Management0")
-                        if mgmt_ip:
-                            node["mgmt_ip"] = mgmt_ip
-
-                    node_group["nodes"].append(node)
-                    processed_leafs.add(leaf_name)
-
-                l3leaf_node_groups.append(node_group)
-            else:
-                # Standalone L3 leaf (shouldn't happen in typical L3LS, but handle it)
-                node: dict[str, Any] = {"name": hostname, "id": global_leaf_id}
-                global_leaf_id += 1
-                if hostname in ip_lookup:
-                    mgmt_ip = ip_lookup[hostname].get("Management1") or ip_lookup[hostname].get("Management0")
-                    if mgmt_ip:
-                        node["mgmt_ip"] = mgmt_ip
-
-                l3leaf_node_groups.append(
-                    {
-                        "group": hostname.replace("-", "_").upper(),
-                        "bgp_as": bgp_as_counter,
-                        "nodes": [node],
-                    }
-                )
-                bgp_as_counter += 1
-                processed_leafs.add(hostname)
-
-        l3leafs_vars["l3leaf"]["node_groups"] = l3leaf_node_groups
-
-        # Generate L2_LEAFS group_vars (if any L2 leafs exist)
-        l2leafs_vars: dict[str, Any] = {}
-        if l2leafs:
-            l2leafs_vars = {
-                "type": "l2leaf",
-                "l2leaf": {
-                    "defaults": {
-                        "platform": "vEOS-lab",
-                        "spanning_tree_mode": "mstp",
-                    },
-                    "node_groups": [],
+    def _generate_l2leaf_group_vars(
+        self,
+        l2leafs: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        uplinks: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for l2leaf node type."""
+        result: dict[str, Any] = {
+            "type": "l2leaf",
+            "l2leaf": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "spanning_tree_mode": "mstp",
                 },
+                "node_groups": [],
+            },
+        }
+
+        # Group L2 leafs by their uplink switches
+        l2leaf_groups: dict[str, list[str]] = {}
+        for hostname in l2leafs:
+            uplink_info = uplinks.get(hostname, {})
+            uplink_switches = tuple(sorted(uplink_info.get("uplink_switches", [])))
+            group_key = "_".join(uplink_switches) if uplink_switches else "STANDALONE"
+            if group_key not in l2leaf_groups:
+                l2leaf_groups[group_key] = []
+            l2leaf_groups[group_key].append(hostname)
+
+        group_counter = 1
+        for uplink_key, leaf_names in l2leaf_groups.items():
+            uplink_switch_list = uplink_key.split("_") if uplink_key != "STANDALONE" else []
+            node_group: dict[str, Any] = {
+                "group": f"DC1_L2_LEAF{group_counter}",
+                "nodes": [],
             }
+            if uplink_switch_list:
+                node_group["uplink_switches"] = uplink_switch_list
 
-            # Group L2 leafs by their uplink switches
-            l2leaf_groups: dict[str, list[str]] = {}
-            for hostname in l2leafs:
-                uplink_info = uplinks.get(hostname, {})
-                uplink_switches = tuple(sorted(uplink_info.get("uplink_switches", [])))
-                group_key = "_".join(uplink_switches) if uplink_switches else "STANDALONE"
-                if group_key not in l2leaf_groups:
-                    l2leaf_groups[group_key] = []
-                l2leaf_groups[group_key].append(hostname)
+            for idx, leaf_name in enumerate(sorted(leaf_names), 1):
+                node: dict[str, Any] = {"name": leaf_name, "id": idx}
+                mgmt_ip = self._get_mgmt_ip(leaf_name, ip_lookup)
+                if mgmt_ip:
+                    node["mgmt_ip"] = mgmt_ip
+                node_group["nodes"].append(node)
 
-            group_counter = 1
-            for uplink_key, leaf_names in l2leaf_groups.items():
-                uplink_switches = uplink_key.split("_") if uplink_key != "STANDALONE" else []
-                node_group: dict[str, Any] = {
-                    "group": f"DC1_L2_LEAF{group_counter}",
-                    "uplink_switches": uplink_switches or None,
-                    "nodes": [],
-                }
-                # Remove None values
-                node_group = {k: v for k, v in node_group.items() if v is not None}
+            result["l2leaf"]["node_groups"].append(node_group)
+            group_counter += 1
 
-                for idx, leaf_name in enumerate(sorted(leaf_names), 1):
-                    node: dict[str, Any] = {"name": leaf_name, "id": idx}
-                    if leaf_name in ip_lookup:
-                        mgmt_ip = ip_lookup[leaf_name].get("Management1") or ip_lookup[leaf_name].get("Management0")
-                        if mgmt_ip:
-                            node["mgmt_ip"] = mgmt_ip
-                    node_group["nodes"].append(node)
+        return result
 
-                l2leafs_vars["l2leaf"]["node_groups"].append(node_group)
-                group_counter += 1
+    def _generate_mpls_p_group_vars(
+        self,
+        p_routers: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for MPLS P (provider) router node type."""
+        result: dict[str, Any] = {
+            "type": "p",
+            "p": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "loopback_ipv4_pool": "10.255.0.0/27",
+                    "isis_system_id_prefix": "0000.0001",
+                },
+                "nodes": [],
+            },
+        }
+        for idx, hostname in enumerate(sorted(p_routers.keys()), 1):
+            node: dict[str, Any] = {"name": hostname, "id": idx}
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result["p"]["nodes"].append(node)
+        return result
+
+    def _generate_mpls_pe_group_vars(
+        self,
+        pe_routers: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+        rr_routers: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for MPLS PE (provider edge) router node type."""
+        result: dict[str, Any] = {
+            "type": "pe",
+            "pe": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "loopback_ipv4_pool": "10.255.1.0/27",
+                    "isis_system_id_prefix": "0000.0002",
+                    "mpls_route_reflectors": sorted(rr_routers.keys()) if rr_routers else [],
+                },
+                "nodes": [],
+            },
+        }
+        for idx, hostname in enumerate(sorted(pe_routers.keys()), 1):
+            node: dict[str, Any] = {"name": hostname, "id": idx}
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result["pe"]["nodes"].append(node)
+        return result
+
+    def _generate_mpls_rr_group_vars(
+        self,
+        rr_routers: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for MPLS RR (route reflector) node type."""
+        result: dict[str, Any] = {
+            "type": "rr",
+            "rr": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "loopback_ipv4_pool": "10.255.2.0/27",
+                    "isis_system_id_prefix": "0000.0003",
+                },
+                "nodes": [],
+            },
+        }
+        for idx, hostname in enumerate(sorted(rr_routers.keys()), 1):
+            node: dict[str, Any] = {"name": hostname, "id": idx}
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result["rr"]["nodes"].append(node)
+        return result
+
+    def _generate_wan_rr_group_vars(
+        self,
+        wan_rrs: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for WAN route reflector node type."""
+        result: dict[str, Any] = {
+            "type": "wan_rr",
+            "wan_rr": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "loopback_ipv4_pool": "10.255.0.0/27",
+                    "vtep_loopback_ipv4_pool": "10.255.1.0/27",
+                    "cv_pathfinder_region": "Global",
+                    "cv_pathfinder_site": "SITE-RR",
+                },
+                "nodes": [],
+            },
+        }
+        for idx, hostname in enumerate(sorted(wan_rrs.keys()), 1):
+            node: dict[str, Any] = {"name": hostname, "id": idx}
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result["wan_rr"]["nodes"].append(node)
+        return result
+
+    def _generate_wan_router_group_vars(
+        self,
+        wan_routers: dict[str, dict[str, Any]],
+        ip_lookup: dict[str, dict[str, str]],
+    ) -> dict[str, Any]:
+        """Generate group_vars for WAN router node type."""
+        result: dict[str, Any] = {
+            "type": "wan_router",
+            "wan_router": {
+                "defaults": {
+                    "platform": "vEOS-lab",
+                    "loopback_ipv4_pool": "10.255.2.0/27",
+                    "vtep_loopback_ipv4_pool": "10.255.3.0/27",
+                },
+                "nodes": [],
+            },
+        }
+        for idx, hostname in enumerate(sorted(wan_routers.keys()), 1):
+            node: dict[str, Any] = {"name": hostname, "id": idx}
+            mgmt_ip = self._get_mgmt_ip(hostname, ip_lookup)
+            if mgmt_ip:
+                node["mgmt_ip"] = mgmt_ip
+            result["wan_router"]["nodes"].append(node)
+        return result
+
+    def generate_avd_group_vars(self, site_name: str | None = None) -> dict[str, Any]:
+        """
+        Generate complete AVD group_vars from NetBox data.
+
+        This creates fabric variables, node type defaults, and network services
+        suitable for populating AVD group_vars files.
+
+        The generated structure follows AVD eos_designs schema requirements:
+        - Separate files for each node type group
+        - All required fields for schema validation
+        - Proper node type classification
+        - Support for multiple topology types: l3ls, l2ls, campus, mpls, wan
+
+        Args:
+            site_name: NetBox site to fetch data from (slug format)
+
+        Returns:
+            Dict with AVD group_vars structure, organized by file type
+        """
+        # Fetch all required data
+        devices = self.fetch_devices_from_netbox(site_name)
+        connections = self.fetch_cables_from_netbox(site_name)
+        vlans = self.fetch_vlans_from_netbox(site_name)
+        vrfs = self.fetch_vrfs_from_netbox()
+        ip_addresses = self.fetch_ip_addresses_from_netbox(site_name)
+
+        # Detect topology type and underlay protocol
+        # Pass ip_addresses to detect L2LS fabrics (no loopback IPs)
+        topology_type = self._detect_topology_type(devices, ip_addresses)
+        underlay_protocol = self._detect_underlay_protocol(topology_type)
+
+        # Build topology from connections
+        uplinks = self._build_uplink_topology(connections, devices)
+        mlag_peers = self._build_mlag_topology(connections, devices)
+
+        # Group devices by their node type (pass topology_type for L2LS reclassification)
+        grouped_devices = self._group_devices_by_type(devices, uplinks, topology_type)
+
+        # Build IP address lookup by device/interface
+        ip_lookup: dict[str, dict[str, str]] = {}
+        for ip in ip_addresses:
+            device = ip.get("device")
+            interface = ip.get("interface")
+            if device and interface:
+                if device not in ip_lookup:
+                    ip_lookup[device] = {}
+                ip_lookup[device][interface] = ip.get("address", "")
+
+        # Build fabric name from site
+        fabric_name = f"{site_name.upper()}_FABRIC" if site_name else "FABRIC"
+
+        # Shorthand for grouped devices
+        spines = grouped_devices["spine"]
+        l2spines = grouped_devices["l2spine"]
+        l3spines = grouped_devices["l3spine"]
+        l3leafs = grouped_devices["l3leaf"]
+        l2leafs = grouped_devices["l2leaf"]
+        p_routers = grouped_devices["p"]
+        pe_routers = grouped_devices["pe"]
+        rr_routers = grouped_devices["rr"]
+        wan_rrs = grouped_devices["wan_rr"]
+        wan_routers = grouped_devices["wan_router"]
+
+        # Generate FABRIC variables based on topology type
+        fabric_vars: dict[str, Any] = {
+            "fabric_name": fabric_name,
+            "p2p_uplinks_mtu": 1500,
+        }
+
+        # Add underlay/overlay protocols (not needed for all topologies)
+        if topology_type in ("l3ls", "campus"):
+            fabric_vars["underlay_routing_protocol"] = underlay_protocol
+            if underlay_protocol == "ebgp":
+                fabric_vars["overlay_routing_protocol"] = "ebgp"
+            else:
+                fabric_vars["overlay_routing_protocol"] = "ibgp"
+        elif topology_type == "mpls":
+            # MPLS uses core_interfaces instead
+            fabric_vars["underlay_routing_protocol"] = "isis"
+            core_intf = self._build_core_interfaces(connections, devices)
+            fabric_vars["core_interfaces"] = core_intf
+
+        # Generate default_interfaces based on topology type
+        default_interfaces = self._generate_default_interfaces(topology_type)
+        if default_interfaces:
+            fabric_vars["default_interfaces"] = default_interfaces
+
+        # Initialize result dict
+        result: dict[str, Any] = {"FABRIC": fabric_vars}
+
+        # Generate node type specific group_vars based on what devices exist
+        # -------------------------------------------------------------------
+
+        # SPINE (standard L3LS topology)
+        if spines:
+            spines_vars = self._generate_spine_group_vars(spines, ip_lookup, "spine", bgp_as=65100)
+            result["SPINES"] = spines_vars
+
+        # L2SPINE (L2LS topology)
+        if l2spines:
+            l2spines_vars = self._generate_l2spine_group_vars(l2spines, ip_lookup, mlag_peers)
+            result["L2_SPINES"] = l2spines_vars
+
+        # L3SPINE (Campus topology)
+        if l3spines:
+            l3spines_vars = self._generate_l3spine_group_vars(l3spines, ip_lookup, mlag_peers)
+            result["L3_SPINES"] = l3spines_vars
+
+        # L3LEAF (L3LS topology)
+        if l3leafs:
+            # Determine uplink switches (prefer spines, then l3spines, then l2spines)
+            uplink_switch_list = sorted(spines.keys()) or sorted(l3spines.keys()) or sorted(l2spines.keys())
+            l3leafs_vars = self._generate_l3leaf_group_vars(l3leafs, ip_lookup, mlag_peers, uplink_switch_list, len(spines) + len(l3spines))
+            result["L3_LEAFS"] = l3leafs_vars
+
+        # L2LEAF (all topologies)
+        if l2leafs:
+            l2leafs_vars = self._generate_l2leaf_group_vars(l2leafs, ip_lookup, uplinks)
+            result["L2_LEAFS"] = l2leafs_vars
+
+        # MPLS topology node types (p, pe, rr)
+        if p_routers:
+            p_vars = self._generate_mpls_p_group_vars(p_routers, ip_lookup)
+            result["P_ROUTERS"] = p_vars
+
+        if pe_routers:
+            pe_vars = self._generate_mpls_pe_group_vars(pe_routers, ip_lookup, rr_routers)
+            result["PE_ROUTERS"] = pe_vars
+
+        if rr_routers:
+            rr_vars = self._generate_mpls_rr_group_vars(rr_routers, ip_lookup)
+            result["RR_ROUTERS"] = rr_vars
+
+        # WAN topology node types
+        if wan_rrs:
+            wan_rr_vars = self._generate_wan_rr_group_vars(wan_rrs, ip_lookup)
+            result["WAN_RRS"] = wan_rr_vars
+
+        if wan_routers:
+            wan_router_vars = self._generate_wan_router_group_vars(wan_routers, ip_lookup)
+            result["WAN_ROUTERS"] = wan_router_vars
 
         # Generate NETWORK_SERVICES group_vars
         network_services_vars: dict[str, Any] = {"tenants": []}
@@ -1356,11 +1967,9 @@ class AVDNetBoxSync:
 
             network_services_vars["tenants"].append(tenant)
 
-        # Return organized structure
-        return {
-            "FABRIC": fabric_vars,
-            "SPINES": spines_vars,
-            "L3_LEAFS": l3leafs_vars,
-            "L2_LEAFS": l2leafs_vars if l2leafs else None,
-            "NETWORK_SERVICES": network_services_vars,
-        }
+        # Add network services (only for non-MPLS topologies that have VLANs/VRFs)
+        if topology_type != "mpls" and network_services_vars.get("tenants"):
+            result["NETWORK_SERVICES"] = network_services_vars
+
+        # Return organized structure (filter out None values)
+        return {k: v for k, v in result.items() if v is not None}

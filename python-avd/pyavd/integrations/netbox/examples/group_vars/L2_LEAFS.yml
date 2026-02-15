@@ -1,4 +1,3 @@
----
 type: l2leaf
 l2leaf:
   defaults:
@@ -6,16 +5,16 @@ l2leaf:
     spanning_tree_mode: mstp
   node_groups:
   - group: DC1_L2_LEAF1
-    uplink_switches:
-    - dc1-leaf1a
-    - dc1-leaf1b
     nodes:
-    - name: dc1-leaf1c
+    - name: LEAF3C
       id: 1
-  - group: DC1_L2_LEAF2
+      mgmt_ip: 172.16.100.108/24
+    - name: LEAF3D
+      id: 2
+      mgmt_ip: 172.16.100.109/24
+    - name: LEAF3E
+      id: 3
+      mgmt_ip: 172.16.100.110/24
     uplink_switches:
-    - dc1-leaf2a
-    - dc1-leaf2b
-    nodes:
-    - name: dc1-leaf2c
-      id: 1
+    - LEAF3A
+    - LEAF3B

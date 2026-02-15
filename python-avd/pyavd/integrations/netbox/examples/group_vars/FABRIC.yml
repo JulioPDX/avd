@@ -1,8 +1,7 @@
----
-fabric_name: DC1_FABRIC
+fabric_name: CAMPUS_FABRIC
+p2p_uplinks_mtu: 1500
 underlay_routing_protocol: ebgp
 overlay_routing_protocol: ebgp
-p2p_uplinks_mtu: 1500
 default_interfaces:
 - types:
   - spine
