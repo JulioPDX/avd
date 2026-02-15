@@ -1184,9 +1184,12 @@ class AVDNetBoxSync:
         }
 
         # Group l3leafs by MLAG pairs
+        # NOTE: IDs must be globally unique across all node_groups, not just within each group.
+        # AVD uses the leaf ID to calculate spine downlink interfaces from the default_interfaces pool.
         processed_leafs: set[str] = set()
         l3leaf_node_groups: list[dict[str, Any]] = []
         bgp_as_counter = 65101  # Start BGP AS for leafs
+        global_leaf_id = 1  # Global ID counter for spine downlink interface calculation
 
         for hostname in sorted(l3leafs.keys()):
             if hostname in processed_leafs:
@@ -1205,8 +1208,9 @@ class AVDNetBoxSync:
                 }
                 bgp_as_counter += 1
 
-                for idx, leaf_name in enumerate([hostname, peer], 1):
-                    node: dict[str, Any] = {"name": leaf_name, "id": idx}
+                for leaf_name in [hostname, peer]:
+                    node: dict[str, Any] = {"name": leaf_name, "id": global_leaf_id}
+                    global_leaf_id += 1
 
                     # Add management IP
                     if leaf_name in ip_lookup:
@@ -1220,7 +1224,8 @@ class AVDNetBoxSync:
                 l3leaf_node_groups.append(node_group)
             else:
                 # Standalone L3 leaf (shouldn't happen in typical L3LS, but handle it)
-                node: dict[str, Any] = {"name": hostname, "id": 1}
+                node: dict[str, Any] = {"name": hostname, "id": global_leaf_id}
+                global_leaf_id += 1
                 if hostname in ip_lookup:
                     mgmt_ip = ip_lookup[hostname].get("Management1") or ip_lookup[hostname].get("Management0")
                     if mgmt_ip:

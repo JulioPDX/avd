@@ -27,6 +27,6 @@ l3leaf:
     bgp_as: 65102
     nodes:
     - name: dc1-leaf2a
-      id: 1
+      id: 3
     - name: dc1-leaf2b
-      id: 2
+      id: 4
