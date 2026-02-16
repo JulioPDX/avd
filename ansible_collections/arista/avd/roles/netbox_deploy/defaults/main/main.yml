@@ -2,6 +2,10 @@
 
 avd_structured_config_file_format: "yml"
 
+# Directory containing AVD structured configs (YAML files).
+# Defaults to the standard AVD output location relative to inventory.
+structured_dir: "{{ inventory_dir }}/intended/structured_configs"
+
 # NetBox server configuration
 # netbox_url: <str>  # Required - URL of the NetBox instance
 # netbox_token: <str>  # Required - NetBox API token (use Ansible Vault)

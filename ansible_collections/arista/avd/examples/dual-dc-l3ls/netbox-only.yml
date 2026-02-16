@@ -9,10 +9,7 @@
     netbox_site_mapping:
       dc1: "DC1_JULIO"
       dc2: "DC2_JULIO"
-    netbox_return_details: true
     netbox_reconcile: true
-    root_dir: "{{ playbook_dir }}"
-    structured_dir: "{{ root_dir }}/intended/structured_configs"
     netbox_verify_ssl: false
     # Async is enabled by default (netbox_use_async: true)
   tasks:

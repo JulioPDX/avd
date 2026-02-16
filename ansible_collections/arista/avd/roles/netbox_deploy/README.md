@@ -85,13 +85,14 @@ This basic example will deploy configurations for all devices in the structured 
 
 ### Directory Configuration
 
-The role uses the same directory structure as other AVD roles:
+The role defaults to the standard AVD directory structure:
 
 ```yaml
-root_dir: '{{ inventory_dir }}'
-output_dir: '{{ root_dir }}/intended'
-structured_dir: '{{ output_dir }}/structured_configs'
+structured_dir: '{{ inventory_dir }}/intended/structured_configs'
 ```
+
+This default works automatically when running in the standard AVD workflow. Override only if your
+structured configs are in a different location.
 
 ## Node Type Inference
 
@@ -182,8 +183,6 @@ The role is designed to run after `eos_designs` and `eos_cli_config_gen` in a ty
     netbox_url: "https://netbox.example.com"
     netbox_token: "{{ vault_netbox_token }}"
     netbox_site_name: "DC1"
-    root_dir: "{{ playbook_dir }}"
-    structured_dir: "{{ root_dir }}/intended/structured_configs"
   tasks:
     - name: Deploy to NetBox
       ansible.builtin.import_role:
@@ -191,8 +190,9 @@ The role is designed to run after `eos_designs` and `eos_cli_config_gen` in a ty
 ```
 
 > **Note**: The NetBox sync play uses `hosts: localhost` to avoid inheriting
-> network device connection settings from group_vars. Results are automatically
-> displayed by the role when `netbox_display_results: true` (default).
+> network device connection settings from group_vars. The `structured_dir` defaults
+> to `{{ inventory_dir }}/intended/structured_configs` which works automatically
+> in standard AVD workflows.
 
 ## Multi-Site Deployments
 
@@ -210,8 +210,6 @@ For multi-site deployments where devices from different sites are in the same st
     netbox_site_mapping:
       dc1: "DC1_Site"
       dc2: "DC2_Site"
-    root_dir: "{{ playbook_dir }}"
-    structured_dir: "{{ root_dir }}/intended/structured_configs"
   tasks:
     - name: Deploy to NetBox
       ansible.builtin.import_role:
