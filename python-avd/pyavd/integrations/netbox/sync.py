@@ -5,14 +5,16 @@
 """
 AVD to NetBox Synchronization Logic.
 
-Provides bidirectional synchronization between AVD structured configuration data and NetBox.
-This module is intentionally kept as a single file to maintain cohesion between
-AVD-to-NetBox and NetBox-to-AVD sync logic, which share common infrastructure.
+Provides synchronization from AVD structured configuration data to NetBox.
+This module syncs devices, interfaces, VLANs, VRFs, cables, IP addresses,
+prefixes, ASNs, port-channels (LAGs), and interface VLAN/VRF associations.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -606,6 +608,530 @@ class AVDNetBoxSync:
 
         return result
 
+    def sync_prefix(self, prefix: str, vrf_name: str | None = None, description: str = "") -> SyncResult:
+        """
+        Sync a prefix (IP subnet) to NetBox.
+
+        Args:
+            prefix: IPv4/IPv6 network in CIDR notation (e.g., "10.0.0.0/24")
+            vrf_name: Optional VRF name to assign to the prefix
+            description: Optional description for the prefix
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Validate prefix format
+        try:
+            ipaddress.ip_network(prefix, strict=False)
+        except ValueError as e:
+            result.errors.append(f"Invalid prefix format {prefix}: {e}")
+            return result
+
+        # Look up VRF ID if provided
+        vrf_id = None
+        if vrf_name:
+            vrf = self._find_netbox_object(endpoints["vrfs"], name=vrf_name)
+            if vrf:
+                vrf_id = vrf["id"]
+
+        # Check if prefix already exists
+        search_params: dict[str, Any] = {"prefix": prefix}
+        if vrf_id:
+            search_params["vrf_id"] = vrf_id
+        existing = self._find_netbox_object(endpoints["prefixes"], **search_params)
+
+        if self.dry_run:
+            LOGGER.info("[DRY RUN] Would %s prefix: %s", "update" if existing else "create", prefix)
+            result.skipped += 1
+            return result
+
+        prefix_data: dict[str, Any] = {
+            "prefix": prefix,
+            "status": "active",
+        }
+        if vrf_id:
+            prefix_data["vrf"] = vrf_id
+        if description:
+            prefix_data["description"] = description
+
+        try:
+            if existing:
+                self.client.patch(f"{endpoints['prefixes']}{existing['id']}/", prefix_data)
+                result.updated += 1
+            else:
+                self.client.post(endpoints["prefixes"], prefix_data)
+                result.created += 1
+        except Exception as e:
+            result.errors.append(f"Failed to sync prefix {prefix}: {e}")
+
+        return result
+
+    def sync_prefixes_from_config(self, avd_structured_config: dict[str, Any]) -> SyncResult:
+        """
+        Extract and sync all prefixes from AVD structured config.
+
+        Extracts prefixes from:
+        - Loopback interfaces (as /32 or /128 host routes, plus network prefixes)
+        - VLAN interfaces (SVI subnets)
+        - Management interfaces
+        - P2P links on ethernet interfaces
+
+        Args:
+            avd_structured_config: AVD structured configuration for a device
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        synced_prefixes: set[tuple[str, str | None]] = set()  # (prefix, vrf_name) to avoid duplicates
+
+        # Extract from loopback interfaces
+        for loop in avd_structured_config.get("loopback_interfaces", []):
+            if ip_addr := loop.get("ip_address"):
+                # Convert host IP to network prefix (e.g., 10.0.0.1/32 stays as /32 for loopbacks)
+                try:
+                    network = ipaddress.ip_network(ip_addr, strict=False)
+                    prefix_str = str(network)
+                    vrf_name = loop.get("vrf")
+                    key = (prefix_str, vrf_name)
+                    if key not in synced_prefixes:
+                        synced_prefixes.add(key)
+                        result = result + self.sync_prefix(prefix_str, vrf_name, loop.get("description", ""))
+                except ValueError:
+                    continue
+
+        # Extract from VLAN interfaces (SVIs)
+        for vlan_intf in avd_structured_config.get("vlan_interfaces", []):
+            vrf_name = vlan_intf.get("vrf")
+            description = vlan_intf.get("description", "")
+
+            # Regular IP address
+            if ip_addr := vlan_intf.get("ip_address"):
+                try:
+                    network = ipaddress.ip_network(ip_addr, strict=False)
+                    prefix_str = str(network)
+                    key = (prefix_str, vrf_name)
+                    if key not in synced_prefixes:
+                        synced_prefixes.add(key)
+                        result = result + self.sync_prefix(prefix_str, vrf_name, description)
+                except ValueError:
+                    continue
+
+            # Virtual IP (anycast gateway)
+            if virtual_ip := vlan_intf.get("ip_address_virtual"):
+                try:
+                    network = ipaddress.ip_network(virtual_ip, strict=False)
+                    prefix_str = str(network)
+                    key = (prefix_str, vrf_name)
+                    if key not in synced_prefixes:
+                        synced_prefixes.add(key)
+                        result = result + self.sync_prefix(prefix_str, vrf_name, f"SVI {vlan_intf.get('name', '')} anycast")
+                except ValueError:
+                    continue
+
+        # Extract from management interfaces
+        for mgmt in avd_structured_config.get("management_interfaces", []):
+            if ip_addr := mgmt.get("ip_address"):
+                try:
+                    network = ipaddress.ip_network(ip_addr, strict=False)
+                    prefix_str = str(network)
+                    vrf_name = mgmt.get("vrf")
+                    key = (prefix_str, vrf_name)
+                    if key not in synced_prefixes:
+                        synced_prefixes.add(key)
+                        result = result + self.sync_prefix(prefix_str, vrf_name, "Management Network")
+                except ValueError:
+                    continue
+
+        # Extract from P2P ethernet interface links
+        for eth in avd_structured_config.get("ethernet_interfaces", []):
+            if ip_addr := eth.get("ip_address"):
+                try:
+                    network = ipaddress.ip_network(ip_addr, strict=False)
+                    # Only sync /30 or /31 P2P links as prefixes
+                    if network.prefixlen >= 30 or (network.version == 6 and network.prefixlen >= 126):
+                        prefix_str = str(network)
+                        vrf_name = eth.get("vrf")
+                        key = (prefix_str, vrf_name)
+                        if key not in synced_prefixes:
+                            synced_prefixes.add(key)
+                            result = result + self.sync_prefix(prefix_str, vrf_name, eth.get("description", "P2P Link"))
+                except ValueError:
+                    continue
+
+        return result
+
+    def sync_asn(self, asn: int | str) -> SyncResult:
+        """
+        Sync an ASN (Autonomous System Number) to NetBox.
+
+        Args:
+            asn: BGP AS number (supports asdot notation like "65001.1")
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Convert asdot notation to integer if needed
+        asn_int = self._parse_asn(asn)
+        if asn_int is None:
+            result.errors.append(f"Invalid ASN format: {asn}")
+            return result
+
+        # Check if ASN already exists
+        existing = self._find_netbox_object(endpoints["asns"], asn=asn_int)
+
+        if self.dry_run:
+            LOGGER.info("[DRY RUN] Would %s ASN: %s", "update" if existing else "create", asn_int)
+            result.skipped += 1
+            return result
+
+        # Ensure RIR exists (required by NetBox)
+        rir = self._ensure_rir()
+        if not rir:
+            result.errors.append("Failed to create/find RIR for ASN")
+            return result
+
+        asn_data = {
+            "asn": asn_int,
+            "rir": rir["id"],
+        }
+
+        try:
+            if existing:
+                self.client.patch(f"{endpoints['asns']}{existing['id']}/", asn_data)
+                result.updated += 1
+            else:
+                self.client.post(endpoints["asns"], asn_data)
+                result.created += 1
+            LOGGER.debug("Synced ASN %s", asn_int)
+        except Exception as e:
+            result.errors.append(f"Failed to sync ASN {asn_int}: {e}")
+
+        return result
+
+    def _parse_asn(self, asn: int | str) -> int | None:
+        """
+        Parse ASN from various formats to integer.
+
+        Supports:
+        - Plain integer: 65001
+        - String integer: "65001"
+        - Asdot notation: "65001.100" (converts to 4260032612)
+        """
+        if isinstance(asn, int):
+            return asn
+        if isinstance(asn, str):
+            if "." in asn:
+                # Asdot notation: high.low
+                try:
+                    parts = asn.split(".")
+                    if len(parts) == 2:
+                        high = int(parts[0])
+                        low = int(parts[1])
+                        return (high << 16) + low
+                except ValueError:
+                    return None
+            else:
+                try:
+                    return int(asn)
+                except ValueError:
+                    return None
+        return None
+
+    def _ensure_rir(self) -> dict[str, Any] | None:
+        """Ensure a default RIR exists in NetBox for ASN assignments."""
+        endpoints = self.mapping.get_netbox_endpoints()
+        rir = self._find_netbox_object(endpoints["rirs"], slug="private")
+        if rir:
+            return rir
+
+        # Create a private/internal RIR
+        try:
+            return self.client.post(
+                endpoints["rirs"],
+                {
+                    "name": "Private",
+                    "slug": "private",
+                    "is_private": True,
+                },
+            )
+        except Exception as e:
+            LOGGER.warning("Failed to create RIR: %s", e)
+            return None
+
+    def sync_asns_from_config(self, avd_structured_config: dict[str, Any]) -> SyncResult:
+        """
+        Extract and sync ASNs from AVD structured config.
+
+        Extracts ASNs from:
+        - router_bgp.as (local AS number)
+        - BGP neighbors (remote AS numbers)
+
+        Args:
+            avd_structured_config: AVD structured configuration for a device
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        synced_asns: set[int] = set()
+
+        # Extract from router_bgp.as
+        router_bgp = avd_structured_config.get("router_bgp", {})
+        if bgp_as := router_bgp.get("as"):
+            asn_int = self._parse_asn(bgp_as)
+            if asn_int and asn_int not in synced_asns:
+                synced_asns.add(asn_int)
+                result = result + self.sync_asn(bgp_as)
+
+        # Extract from BGP neighbors
+        for neighbor in router_bgp.get("neighbors", []):
+            if remote_as := neighbor.get("remote_as"):
+                asn_int = self._parse_asn(remote_as)
+                if asn_int and asn_int not in synced_asns:
+                    synced_asns.add(asn_int)
+                    result = result + self.sync_asn(remote_as)
+
+        return result
+
+    def sync_port_channels(self, avd_structured_config: dict[str, Any]) -> SyncResult:
+        """
+        Sync port-channel interfaces as LAG type and update member interface LAG assignments.
+
+        This method:
+        1. Creates/updates port-channel interfaces with type='lag' in NetBox
+        2. Updates member ethernet interfaces with the 'lag' field pointing to the port-channel
+
+        Args:
+            avd_structured_config: AVD structured configuration for a device
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        hostname = avd_structured_config.get("hostname")
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        if not hostname:
+            return result
+
+        # Find device in NetBox
+        device = self._find_netbox_object(endpoints["devices"], name=hostname)
+        if not device:
+            LOGGER.debug("Device %s not found in NetBox for port-channel sync", hostname)
+            return result
+
+        device_id = device["id"]
+
+        # Build a map of ethernet interfaces to their channel groups
+        eth_to_channel: dict[str, int] = {}
+        for eth in avd_structured_config.get("ethernet_interfaces", []):
+            if channel_group := eth.get("channel_group"):
+                channel_id = channel_group.get("id")
+                eth_name = eth.get("name")
+                if channel_id and eth_name:
+                    eth_to_channel[eth_name] = channel_id
+
+        # Process port-channel interfaces
+        for pc in avd_structured_config.get("port_channel_interfaces", []):
+            pc_name = pc.get("name")
+            if not pc_name:
+                continue
+
+            # Extract port-channel ID from name (e.g., "Port-Channel5" -> 5)
+            pc_id = self._extract_port_channel_id(pc_name)
+            if pc_id is None:
+                continue
+
+            # Find or create the port-channel interface in NetBox
+            existing_pc = self._find_netbox_object(endpoints["interfaces"], device_id=device_id, name=pc_name)
+
+            pc_data: dict[str, Any] = {
+                "name": pc_name,
+                "device": device_id,
+                "type": "lag",  # LAG type for port-channels
+                "description": pc.get("description", ""),
+            }
+
+            # Handle mode from switchport config
+            switchport = pc.get("switchport", {})
+            if switchport.get("mode"):
+                mode = switchport["mode"]
+                if mode == "trunk":
+                    pc_data["mode"] = "tagged"
+                elif mode == "access":
+                    pc_data["mode"] = "access"
+
+            if self.dry_run:
+                result.skipped += 1
+                continue
+
+            try:
+                if existing_pc:
+                    self.client.patch(f"{endpoints['interfaces']}{existing_pc['id']}/", pc_data)
+                    result.updated += 1
+                    pc_intf_id = existing_pc["id"]
+                else:
+                    new_pc = self.client.post(endpoints["interfaces"], pc_data)
+                    result.created += 1
+                    pc_intf_id = new_pc["id"]
+
+                # Update member interfaces with LAG assignment
+                for eth_name, channel_id in eth_to_channel.items():
+                    if channel_id == pc_id:
+                        eth_intf = self._find_netbox_object(endpoints["interfaces"], device_id=device_id, name=eth_name)
+                        if eth_intf:
+                            self.client.patch(f"{endpoints['interfaces']}{eth_intf['id']}/", {"lag": pc_intf_id})
+                            LOGGER.debug("Assigned %s to LAG %s", eth_name, pc_name)
+
+            except Exception as e:
+                result.errors.append(f"Failed to sync port-channel {pc_name}: {e}")
+
+        return result
+
+    def _extract_port_channel_id(self, name: str) -> int | None:
+        """Extract port-channel ID from interface name (e.g., 'Port-Channel5' -> 5)."""
+        match = re.match(r"[Pp]ort-?[Cc]hannel(\d+)", name)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def sync_interface_vlan_associations(self, avd_structured_config: dict[str, Any]) -> SyncResult:
+        """
+        Sync VLAN associations (tagged_vlans, untagged_vlan) for interfaces.
+
+        Updates ethernet and port-channel interfaces with their VLAN assignments:
+        - trunk mode -> tagged_vlans (list of VLAN IDs)
+        - access mode -> untagged_vlan (single VLAN ID)
+        - trunk native_vlan -> untagged_vlan
+
+        Args:
+            avd_structured_config: AVD structured configuration for a device
+
+        Returns:
+            SyncResult with operation counts
+        """
+        result = SyncResult()
+        hostname = avd_structured_config.get("hostname")
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        if not hostname:
+            return result
+
+        # Find device in NetBox
+        device = self._find_netbox_object(endpoints["devices"], name=hostname)
+        if not device:
+            return result
+
+        device_id = device["id"]
+
+        # Build VLAN lookup cache (vid -> netbox_id)
+        vlan_cache = self._get_or_cache("vlans_by_vid", endpoints["vlans"], "vid")
+
+        # Process ethernet interfaces
+        for eth in avd_structured_config.get("ethernet_interfaces", []):
+            intf_result = self._sync_interface_vlans(eth, device_id, endpoints, vlan_cache)
+            result = result + intf_result
+
+        # Process port-channel interfaces
+        for pc in avd_structured_config.get("port_channel_interfaces", []):
+            intf_result = self._sync_interface_vlans(pc, device_id, endpoints, vlan_cache)
+            result = result + intf_result
+
+        return result
+
+    def _sync_interface_vlans(
+        self,
+        intf_data: dict[str, Any],
+        device_id: int,
+        endpoints: dict[str, str],
+        vlan_cache: dict[Any, Any],
+    ) -> SyncResult:
+        """Sync VLAN associations for a single interface."""
+        result = SyncResult()
+        intf_name = intf_data.get("name")
+        if not intf_name:
+            return result
+
+        # Find interface in NetBox
+        intf = self._find_netbox_object(endpoints["interfaces"], device_id=device_id, name=intf_name)
+        if not intf:
+            return result
+
+        update_data: dict[str, Any] = {}
+
+        # Get switchport config (new AVD format)
+        switchport = intf_data.get("switchport", {})
+        mode = switchport.get("mode") or intf_data.get("mode")
+        trunk_config = switchport.get("trunk", {})
+
+        if mode == "trunk":
+            # Handle trunk mode
+            allowed_vlans_str = trunk_config.get("allowed_vlan") or intf_data.get("vlans")
+            if allowed_vlans_str:
+                vlan_ids = self._parse_vlan_list(str(allowed_vlans_str))
+                tagged_vlan_ids = [vlan_cache[vid]["id"] for vid in vlan_ids if vid in vlan_cache]
+                if tagged_vlan_ids:
+                    update_data["tagged_vlans"] = tagged_vlan_ids
+
+            # Handle native VLAN
+            native_vlan = trunk_config.get("native_vlan") or intf_data.get("native_vlan")
+            if native_vlan and int(native_vlan) in vlan_cache:
+                update_data["untagged_vlan"] = vlan_cache[int(native_vlan)]["id"]
+
+        elif mode == "access":
+            # Handle access mode
+            access_vlan = switchport.get("access_vlan") or intf_data.get("access_vlan")
+            if access_vlan and int(access_vlan) in vlan_cache:
+                update_data["untagged_vlan"] = vlan_cache[int(access_vlan)]["id"]
+
+        if not update_data:
+            return result
+
+        if self.dry_run:
+            result.skipped += 1
+            return result
+
+        try:
+            self.client.patch(f"{endpoints['interfaces']}{intf['id']}/", update_data)
+            result.updated += 1
+        except Exception as e:
+            result.errors.append(f"Failed to update VLAN associations for {intf_name}: {e}")
+
+        return result
+
+    def _parse_vlan_list(self, vlan_str: str) -> list[int]:
+        """
+        Parse VLAN list string into list of VLAN IDs.
+
+        Handles formats like:
+        - "10" -> [10]
+        - "10,20,30" -> [10, 20, 30]
+        - "10-15" -> [10, 11, 12, 13, 14, 15]
+        - "10-12,20,30-32" -> [10, 11, 12, 20, 30, 31, 32]
+        """
+        vlan_ids: list[int] = []
+        for raw_part in vlan_str.split(","):
+            segment = raw_part.strip()
+            if "-" in segment:
+                try:
+                    start, end = segment.split("-")
+                    vlan_ids.extend(range(int(start), int(end) + 1))
+                except ValueError:
+                    continue
+            else:
+                try:
+                    vlan_ids.append(int(segment))
+                except ValueError:
+                    continue
+        return vlan_ids
+
     def sync_all(
         self,
         avd_structured_configs: dict[str, dict[str, Any]],
@@ -624,9 +1150,10 @@ class AVDNetBoxSync:
         result = SyncResult()
         node_types = node_types or {}
 
-        # First pass: sync VRFs so they exist for interface VRF assignments
+        # First pass: sync VRFs and VLANs so they exist for interface assignments
         for config in avd_structured_configs.values():
             result = result + self.sync_vrfs(config)
+            result = result + self.sync_vlans(config)
 
         # Second pass: sync devices and interfaces
         for hostname, config in avd_structured_configs.items():
@@ -636,13 +1163,25 @@ class AVDNetBoxSync:
             # Sync device first
             result = result + self.sync_device(config, node_type)
 
-            # Then sync related objects (interfaces need VRFs to exist already)
+            # Then sync interfaces (need VRFs/VLANs to exist already)
             result = result + self.sync_interfaces(config)
-            result = result + self.sync_vlans(config)
 
-        # Third pass: set primary IPs after interfaces and IPs exist
+        # Third pass: sync port-channels and update interface LAG memberships
+        for config in avd_structured_configs.values():
+            result = result + self.sync_port_channels(config)
+
+        # Fourth pass: sync interface VLAN associations (needs VLANs and interfaces to exist)
+        for config in avd_structured_configs.values():
+            result = result + self.sync_interface_vlan_associations(config)
+
+        # Fifth pass: set primary IPs after interfaces and IPs exist
         for config in avd_structured_configs.values():
             result = result + self.sync_primary_ip(config)
+
+        # Sixth pass: sync prefixes and ASNs
+        for config in avd_structured_configs.values():
+            result = result + self.sync_prefixes_from_config(config)
+            result = result + self.sync_asns_from_config(config)
 
         # Sync cables after all devices and interfaces exist
         result = result + self.sync_cables(avd_structured_configs)

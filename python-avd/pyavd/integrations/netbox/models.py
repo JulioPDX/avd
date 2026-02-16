@@ -109,6 +109,8 @@ class AVDNetBoxMapping:
             "vlans": "/api/ipam/vlans/",
             "vrfs": "/api/ipam/vrfs/",
             "prefixes": "/api/ipam/prefixes/",
+            "asns": "/api/ipam/asns/",
+            "rirs": "/api/ipam/rirs/",
             "sites": "/api/dcim/sites/",
             "device_roles": "/api/dcim/device-roles/",
             "device_types": "/api/dcim/device-types/",

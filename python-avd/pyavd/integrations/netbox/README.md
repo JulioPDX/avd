@@ -19,12 +19,16 @@ This integration enables you to document your Arista network fabric in NetBox by
 | Data Type | Synced Fields |
 | --------- | ------------- |
 | Devices | hostname, platform, serial, device role, site, status |
-| Ethernet Interfaces | name, description, enabled, MTU, mode, speed, type |
+| Ethernet Interfaces | name, description, enabled, MTU, mode, speed, type, LAG membership |
 | Loopback Interfaces | Loopback0, Loopback1, etc. with IP addresses |
 | Management Interfaces | Management1 with IP, set as device primary_ip4 |
 | VLAN Interfaces (SVIs) | Vlan interfaces with IP addresses and VRF assignment |
+| Port-Channel Interfaces | LAG interfaces with member interface associations |
 | VLANs | VLAN ID, name, status |
 | VRFs | name, description |
+| Interface VLAN Associations | tagged_vlans (trunk), untagged_vlan (access/native) |
+| IP Prefixes | Subnets from loopback pools, P2P links, SVIs, management |
+| ASNs | BGP AS numbers from router_bgp.as and neighbors |
 | Cables | Physical connections between interfaces |
 
 ## Architecture
@@ -117,13 +121,24 @@ class AVDNetBoxSync:
     def __init__(self, client: NetBoxClient, site_name: str = None,
                  dry_run: bool = False, create_prerequisites: bool = False)
 
+    # Main entry point - syncs everything
     def sync_all(self, configs: dict, node_types: dict = None) -> SyncResult
+
+    # Individual sync methods
     def sync_device(self, config: dict, node_type: str = None) -> SyncResult
-    def sync_interface(self, device_id: int, interface: dict) -> SyncResult
-    def sync_vlan(self, vlan: dict) -> SyncResult
-    def sync_vrf(self, vrf: dict) -> SyncResult
-    def sync_cable(self, a_device: str, a_interface: str,
-                   b_device: str, b_interface: str) -> SyncResult
+    def sync_interfaces(self, config: dict) -> SyncResult
+    def sync_vlans(self, config: dict) -> SyncResult
+    def sync_vrfs(self, config: dict) -> SyncResult
+    def sync_cables(self, configs: dict) -> SyncResult
+    def sync_primary_ip(self, config: dict) -> SyncResult
+
+    # New sync methods
+    def sync_prefix(self, prefix: str, vrf_name: str = None, description: str = "") -> SyncResult
+    def sync_prefixes_from_config(self, config: dict) -> SyncResult
+    def sync_asn(self, asn: int | str) -> SyncResult
+    def sync_asns_from_config(self, config: dict) -> SyncResult
+    def sync_port_channels(self, config: dict) -> SyncResult
+    def sync_interface_vlan_associations(self, config: dict) -> SyncResult
 ```
 
 ### SyncResult
