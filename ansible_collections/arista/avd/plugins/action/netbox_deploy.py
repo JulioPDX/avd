@@ -41,7 +41,8 @@ LOGGER = logging.getLogger("ansible_collections.arista.avd")
 ARGUMENT_SPEC = {
     "netbox_url": {"type": "str", "required": True},
     "netbox_token": {"type": "str", "secret": True, "required": True},
-    "site_name": {"type": "str", "required": True},
+    "site_name": {"type": "str", "required": False},
+    "site_mapping": {"type": "dict", "required": False},
     "structured_config_dir": {"type": "str", "required": True},
     "structured_config_suffix": {"type": "str", "default": "yml"},
     "device_list": {"type": "list", "elements": "str", "required": False},
@@ -112,6 +113,13 @@ class ActionModule(ActionBase):
 
     def deploy(self, validated_args: dict, result: dict) -> dict:
         """Load configs and perform NetBox sync."""
+        # Validate site_name or site_mapping is provided
+        site_name = validated_args.get("site_name")
+        site_mapping = validated_args.get("site_mapping")
+        if not site_name and not site_mapping:
+            msg = "Either 'site_name' or 'site_mapping' must be provided"
+            raise AnsibleActionFail(msg)
+
         try:
             # Load structured configs
             configs, node_types = self._load_structured_configs(
@@ -138,7 +146,8 @@ class ActionModule(ActionBase):
             ) as client:
                 sync = AVDNetBoxSync(
                     client=client,
-                    site_name=validated_args["site_name"],
+                    site_name=site_name,
+                    site_mapping=site_mapping,
                     dry_run=dry_run,
                     create_prerequisites=validated_args.get("create_prerequisites", True),
                 )

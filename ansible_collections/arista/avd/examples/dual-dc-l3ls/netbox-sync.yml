@@ -22,7 +22,10 @@
     # Required - override via command line or environment variables
     netbox_url: "{{ lookup('env', 'NETBOX_URL') | default('http://127.0.0.1:8000', true) }}"
     netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
-    netbox_site_name: "Carls_Place"
+    # Site mapping: hostname prefix -> site name (for multi-DC deployments)
+    netbox_site_mapping:
+      dc1: "DC1_JULIO"
+      dc2: "DC2_JULIO"
     netbox_return_details: true
 
     # Path to structured configs (auto-detected from playbook location)

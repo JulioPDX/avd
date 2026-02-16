@@ -32,39 +32,6 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_MANUFACTURER = {"name": "Arista", "slug": "arista"}
 DEFAULT_DEVICE_TYPE = {"model": "vEOS", "slug": "veos"}
 
-# AVD node type categories for topology detection
-SPINE_TYPES = {"spine", "l2spine", "l3spine", "super_spine"}
-LEAF_TYPES = {"l3leaf", "l2leaf", "leaf"}
-MPLS_TYPES = {"p", "pe", "rr"}
-WAN_TYPES = {"wan_rr", "wan_router"}
-ALL_NODE_TYPES = SPINE_TYPES | LEAF_TYPES | MPLS_TYPES | WAN_TYPES
-
-# Underlay protocol detection from NetBox tags or device role patterns
-UNDERLAY_PROTOCOL_MAP = {
-    "isis": "isis",
-    "ospf": "ospf",
-    "ebgp": "ebgp",
-    "ibgp": "ibgp",
-    "none": "none",  # L2LS fabrics with no underlay routing
-}
-
-# Default interface patterns for different topologies
-DEFAULT_INTERFACE_PATTERNS = {
-    "l3ls": {
-        "spine": {"uplink_interfaces": ["Ethernet1-2"], "downlink_interfaces": ["Ethernet1-8"]},
-        "l3leaf": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet3-4"], "downlink_interfaces": ["Ethernet8"]},
-        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
-    },
-    "l2ls": {
-        "l2spine": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet47-48"], "downlink_interfaces": ["Ethernet1-8"]},
-        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
-    },
-    "campus": {
-        "l3spine": {"uplink_interfaces": ["Ethernet1-2"], "mlag_interfaces": ["Ethernet47-48"], "downlink_interfaces": ["Ethernet1-8"]},
-        "l2leaf": {"uplink_interfaces": ["Ethernet1-2"]},
-    },
-}
-
 
 @dataclass
 class SyncResult:
@@ -93,6 +60,7 @@ class AVDNetBoxSync:
         mapping: Field mapping configuration (uses defaults if not provided)
         dry_run: If True, don't make actual changes to NetBox
         site_name: Default NetBox site name for new objects
+        site_mapping: Dict mapping hostname prefix to site name (e.g., {"dc1": "DC1_Site", "dc2": "DC2_Site"})
         create_prerequisites: If True, create missing sites/roles/types in NetBox
     """
 
@@ -103,15 +71,18 @@ class AVDNetBoxSync:
         *,
         dry_run: bool = False,
         site_name: str | None = None,
+        site_mapping: dict[str, str] | None = None,
         create_prerequisites: bool = True,
     ) -> None:
         self.client = client
         self.mapping = mapping or AVDNetBoxMapping()
         self.dry_run = dry_run
         self.site_name = site_name
+        self.site_mapping = site_mapping or {}
         self.create_prerequisites = create_prerequisites
         self._cache: dict[str, dict[str, Any]] = {}
         self._prerequisites_created = False
+        self._site_cache: dict[str, dict[str, Any]] = {}  # Cache for site lookups by name
 
     def _get_or_cache(self, cache_key: str, endpoint: str, lookup_field: str) -> dict[str, Any]:
         """Get cached lookup table or fetch from NetBox."""
@@ -174,6 +145,66 @@ class AVDNetBoxSync:
                 )
 
         self._prerequisites_created = True
+
+    def _get_or_create_site(self, site_name: str) -> dict[str, Any] | None:
+        """
+        Get or create a site by name.
+
+        Args:
+            site_name: Name of the site to get or create
+
+        Returns:
+            Site dict with 'id' field, or None if dry_run
+        """
+        if self.dry_run:
+            return None
+
+        # Check cache first
+        if site_name in self._site_cache:
+            return self._site_cache[site_name]
+
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Try to find existing site
+        site = self._find_netbox_object(endpoints["sites"], name=site_name)
+        if not site and self.create_prerequisites:
+            LOGGER.info("Creating site: %s", site_name)
+            site = self.client.post(
+                endpoints["sites"],
+                {
+                    "name": site_name,
+                    "slug": slugify(site_name),
+                    "status": "active",
+                },
+            )
+
+        if site:
+            self._site_cache[site_name] = site
+
+        return site
+
+    def _get_site_for_hostname(self, hostname: str) -> dict[str, Any] | None:
+        """
+        Get the appropriate site for a hostname based on site_mapping or default site_name.
+
+        Args:
+            hostname: Device hostname
+
+        Returns:
+            Site dict with 'id' field, or None if no site mapping found
+        """
+        # Check site_mapping for prefix match
+        if self.site_mapping:
+            hostname_lower = hostname.lower()
+            for prefix, site_name in self.site_mapping.items():
+                if hostname_lower.startswith(prefix.lower()):
+                    return self._get_or_create_site(site_name)
+
+        # Fall back to default site_name
+        if self.site_name:
+            return self._get_or_create_site(self.site_name)
+
+        return None
 
     def _find_netbox_object(self, endpoint: str, **filters: Any) -> dict[str, Any] | None:
         """Find a single object in NetBox by filters."""
@@ -320,14 +351,20 @@ class AVDNetBoxSync:
             return result
 
         try:
+            # Get site for this hostname (using site_mapping or default site_name)
+            site = self._get_site_for_hostname(hostname)
+
             if existing:
+                # Update existing device - also update site if site_mapping is used
+                if site and self.site_mapping:
+                    netbox_data["site"] = site["id"]
                 self.client.patch(f"{endpoints['devices']}{existing['id']}/", netbox_data)
                 result.updated += 1
                 LOGGER.debug("Updated device: %s", hostname)
             else:
                 # Add required fields for new device
-                if self.site_name and "site" in self._cache:
-                    netbox_data["site"] = self._cache["site"]["id"]
+                if site:
+                    netbox_data["site"] = site["id"]
                 if "device_type" in self._cache:
                     netbox_data["device_type"] = self._cache["device_type"]["id"]
                 LOGGER.debug("Creating device with data: %s", netbox_data)
@@ -395,6 +432,12 @@ class AVDNetBoxSync:
         # Set interface type based on name
         netbox_data["type"] = apply_transform("map_interface_type", intf_name)
 
+        # Handle interface mode from switchport config (new AVD format)
+        # The mapping looks for "mode" at top level, but AVD uses "switchport.mode"
+        switchport = intf_data.get("switchport", {})
+        if switchport.get("enabled", True) and switchport.get("mode"):
+            netbox_data["mode"] = apply_transform("map_interface_mode", switchport["mode"])
+
         # Handle VRF assignment - look up VRF ID by name
         if vrf_name := intf_data.get("vrf"):
             vrf = self._find_netbox_object(endpoints["vrfs"], name=vrf_name)
@@ -424,28 +467,47 @@ class AVDNetBoxSync:
 
             # Sync IP addresses if we have a valid interface
             if intf_for_ip:
+                # Extract VRF ID from the interface (was set during interface creation/update)
+                # This allows duplicate IPs across different VRFs in NetBox
+                vrf_data = intf_for_ip.get("vrf")
+                vrf_id = vrf_data.get("id") if isinstance(vrf_data, dict) else vrf_data
+
                 # Sync IP address if present (regular IP)
                 if ip_addr := intf_data.get("ip_address"):
-                    self._sync_interface_ip(ip_addr, intf_for_ip, endpoints)
+                    self._sync_interface_ip(ip_addr, intf_for_ip, endpoints, vrf_id=vrf_id)
 
                 # Sync virtual IP address if present (anycast gateway IPs on SVIs)
                 if virtual_ip := intf_data.get("ip_address_virtual"):
-                    self._sync_interface_ip(virtual_ip, intf_for_ip, endpoints, role="anycast")
+                    self._sync_interface_ip(virtual_ip, intf_for_ip, endpoints, role="anycast", vrf_id=vrf_id)
 
         except Exception as e:
             result.errors.append(f"Failed to sync interface {intf_name}: {e}")
 
         return result
 
-    def _sync_interface_ip(self, ip_address: str, interface: dict[str, Any], endpoints: dict[str, str], role: str | None = None) -> dict[str, Any] | None:
+    def _sync_interface_ip(
+        self,
+        ip_address: str,
+        interface: dict[str, Any],
+        endpoints: dict[str, str],
+        role: str | None = None,
+        vrf_id: int | None = None,
+    ) -> dict[str, Any] | None:
         """
         Sync IP address for an interface.
+
+        Always looks for an existing IP by address AND assigned interface.
+        This handles several network design patterns where the same IP exists multiple times:
+        - Anycast IPs (same IP on multiple devices for gateway redundancy)
+        - Overlapping IP space across VRFs (same IP on different VLAN interfaces in different VRFs)
+        - MLAG peer-link VLANs (same subnet used for L3 peering in multiple VRFs)
 
         Args:
             ip_address: IP address in CIDR notation
             interface: NetBox interface dict (must have 'id')
             endpoints: NetBox API endpoints
             role: Optional IP role (e.g., 'anycast' for virtual IPs)
+            vrf_id: Optional VRF ID for the IP (allows duplicate IPs in different VRFs)
 
         Returns:
             Created/updated IP address object dict, or None if failed
@@ -457,11 +519,6 @@ class AVDNetBoxSync:
         if not intf_id:
             return None
 
-        existing_ip = self._find_netbox_object(
-            endpoints["ip_addresses"],
-            address=ip_address,
-        )
-
         ip_data: dict[str, Any] = {
             "address": ip_address,
             "assigned_object_type": "dcim.interface",
@@ -472,6 +529,14 @@ class AVDNetBoxSync:
         if role:
             ip_data["role"] = role
 
+        # Add VRF if specified (allows duplicate IPs across different VRFs)
+        if vrf_id:
+            ip_data["vrf"] = vrf_id
+
+        # Always look for existing IP assigned to THIS specific interface
+        # This handles: anycast IPs, overlapping VRF IPs, MLAG peering IPs, etc.
+        existing_ip = self._find_ip_for_interface(endpoints["ip_addresses"], ip_address, intf_id)
+
         try:
             if existing_ip:
                 self.client.patch(f"{endpoints['ip_addresses']}{existing_ip['id']}/", ip_data)
@@ -480,6 +545,25 @@ class AVDNetBoxSync:
         except Exception as e:
             LOGGER.warning("Failed to sync IP %s: %s", ip_address, e)
             return None
+
+    def _find_ip_for_interface(self, ip_endpoint: str, address: str, interface_id: int) -> dict[str, Any] | None:
+        """
+        Find an IP address assigned to a specific interface.
+
+        Args:
+            ip_endpoint: NetBox IP addresses API endpoint
+            address: IP address to search for
+            interface_id: Interface ID to match
+
+        Returns:
+            IP address dict if found, None otherwise
+        """
+        # Get all IPs with this address
+        for ip in self.client.get_all(ip_endpoint, params={"address": address}):
+            assigned_obj = ip.get("assigned_object")
+            if assigned_obj and assigned_obj.get("id") == interface_id:
+                return ip
+        return None
 
     def sync_vlans(self, avd_structured_config: dict[str, Any]) -> SyncResult:
         """Sync VLANs from AVD structured config to NetBox."""

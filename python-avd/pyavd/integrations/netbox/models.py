@@ -63,15 +63,6 @@ class AVDNetBoxMapping:
         ]
     )
 
-    # IP Address mappings (AVD ip_address -> NetBox IPAM IP Address)
-    ip_address_mappings: list[FieldMapping] = field(
-        default_factory=lambda: [
-            FieldMapping("ip_address", "address"),
-            FieldMapping("description", "description"),
-            # assigned_object handled separately via interface relationship
-        ]
-    )
-
     # VLAN mappings (AVD vlans -> NetBox IPAM VLAN)
     vlan_mappings: list[FieldMapping] = field(
         default_factory=lambda: [
@@ -87,15 +78,6 @@ class AVDNetBoxMapping:
             FieldMapping("name", "name"),
             FieldMapping("description", "description"),
             # rd (route distinguisher) mapped if present
-        ]
-    )
-
-    # Prefix mappings (derived from AVD SVI/loopback addresses)
-    prefix_mappings: list[FieldMapping] = field(
-        default_factory=lambda: [
-            FieldMapping("prefix", "prefix"),
-            FieldMapping("vrf", "vrf.name"),
-            FieldMapping("description", "description"),
         ]
     )
 
@@ -118,17 +100,6 @@ class AVDNetBoxMapping:
             "platforms": "/api/dcim/platforms/",
             "cables": "/api/dcim/cables/",
         }
-
-
-# NetBox model requirements - fields that must exist for sync to work
-NETBOX_REQUIRED_MODELS: dict[str, list[str]] = {
-    "device": ["site", "device_role", "device_type"],
-    "interface": ["device"],
-    "ip_address": [],  # Can be unassigned
-    "vlan": [],  # site/group optional
-    "vrf": [],  # tenant optional
-    "prefix": [],  # site/vrf optional
-}
 
 
 # AVD node type to NetBox device role mapping

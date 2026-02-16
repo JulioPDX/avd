@@ -59,12 +59,15 @@ This basic example will deploy configurations for all devices in the structured 
 | -------- | ----------- |
 | `netbox_url` | URL of the NetBox instance |
 | `netbox_token` | NetBox API token (use Ansible Vault) |
-| `netbox_site_name` | Name of the site in NetBox |
+| `netbox_site_name` | Name of the site in NetBox (or use `netbox_site_mapping` for multi-site) |
+
+> **Note**: Either `netbox_site_name` or `netbox_site_mapping` must be provided.
 
 ### Optional Variables
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
+| `netbox_site_mapping` | - | Dict mapping hostname prefix to site name (for multi-site deployments) |
 | `netbox_verify_ssl` | `true` | Verify SSL certificates |
 | `netbox_timeout` | `30.0` | HTTP timeout in seconds |
 | `netbox_create_prerequisites` | `true` | Auto-create site, device types, etc. |
@@ -185,6 +188,33 @@ The role is designed to run after `eos_designs` and `eos_cli_config_gen` in a ty
 > **Note**: The NetBox sync play uses `hosts: localhost` to avoid inheriting
 > network device connection settings from group_vars. Results are automatically
 > displayed by the role when `netbox_display_results: true` (default).
+
+## Multi-Site Deployments
+
+For multi-site deployments where devices from different sites are in the same structured configs directory, use `netbox_site_mapping` to assign devices to sites based on hostname prefix:
+
+```yaml
+- name: Sync Multi-DC to NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    # Map hostname prefixes to NetBox sites
+    netbox_site_mapping:
+      dc1: "DC1_Site"
+      dc2: "DC2_Site"
+    root_dir: "{{ playbook_dir }}"
+    structured_dir: "{{ root_dir }}/intended/structured_configs"
+  tasks:
+    - name: Deploy to NetBox
+      ansible.builtin.import_role:
+        name: arista.avd.netbox_deploy
+```
+
+Devices with hostnames starting with `dc1` (e.g., `dc1-spine1`, `dc1-leaf1a`) will be assigned to "DC1_Site",
+while devices starting with `dc2` will be assigned to "DC2_Site".
 
 ## License
 
