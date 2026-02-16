@@ -44,13 +44,14 @@ pyavd/integrations/netbox/
 
 ### Key Components
 
-**NetBoxClient** - HTTP client with support for v1 and v2 API tokens:
+**NetBoxClient** - Wrapper around pynetbox with support for v1 and v2 API tokens:
 
 ```python
-# v2 tokens (nbt_*) use Bearer auth
-# v1 tokens use Token auth
-with NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy") as client:
-    ...
+from pyavd.integrations.netbox import NetBoxClient
+
+client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
+# Access pynetbox API directly if needed
+client.api.dcim.devices.all()
 ```
 
 **AVDNetBoxSync** - Main synchronization class:
@@ -76,10 +77,12 @@ FieldMapping(
 
 ## Installation
 
-The integration requires `httpx` for HTTP communication:
+The integration requires `pynetbox` for NetBox API communication:
 
 ```bash
-pip install httpx
+pip install 'pyavd[netbox]'
+# Or install pynetbox directly
+pip install pynetbox
 ```
 
 ## Quick Start
@@ -91,23 +94,31 @@ from pyavd.integrations.netbox import NetBoxClient, AVDNetBoxSync
 configs = {"dc1-spine1": {...}, "dc1-leaf1a": {...}}
 node_types = {"dc1-spine1": "spine", "dc1-leaf1a": "l3leaf"}
 
-with NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy") as client:
-    sync = AVDNetBoxSync(client, site_name="DC1", create_prerequisites=True)
-    result = sync.sync_all(configs, node_types)
+client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
+sync = AVDNetBoxSync(client, site_name="DC1", create_prerequisites=True)
+result = sync.sync_all(configs, node_types)
 
-    print(f"Created: {result.created}")
-    print(f"Updated: {result.updated}")
-    print(f"Errors: {len(result.errors)}")
+print(f"Created: {result.created}")
+print(f"Updated: {result.updated}")
+print(f"Errors: {len(result.errors)}")
 ```
 
 ## API Reference
 
 ### NetBoxClient
 
+Wrapper around pynetbox providing a consistent interface:
+
 ```python
 class NetBoxClient:
     def __init__(self, url: str, token: str, *, verify_ssl: bool = True, timeout: float = 30.0)
-    def get(self, endpoint: str, **params) -> dict
+
+    @property
+    def api(self) -> pynetbox.api:
+        """Access the underlying pynetbox API instance."""
+
+    # Convenience methods (maintained for backward compatibility)
+    def get(self, endpoint: str, **params) -> dict | None
     def post(self, endpoint: str, data: dict) -> dict
     def patch(self, endpoint: str, data: dict) -> dict
     def delete(self, endpoint: str) -> None
@@ -176,11 +187,11 @@ pytest tests/pyavd/integrations/netbox/ -v
 
 **Test coverage includes:**
 
-- Client authentication (v1 and v2 tokens)
+- Client wrapper around pynetbox
 - API operations (GET, POST, PATCH, DELETE)
 - Pagination handling
 - All transform functions
-- Sync operations for all data types
+- Sync operations for all data types (123 tests total)
 
 ## Development
 

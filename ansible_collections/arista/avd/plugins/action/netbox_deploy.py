@@ -51,6 +51,7 @@ ARGUMENT_SPEC = {
     "create_prerequisites": {"type": "bool", "default": True},
     "dry_run": {"type": "bool", "default": False},
     "return_details": {"type": "bool", "default": False},
+    "fail_on_errors": {"type": "bool", "default": False},
 }
 
 
@@ -150,7 +151,10 @@ class ActionModule(ActionBase):
             result["updated"] = sync_result.updated
             result["skipped"] = sync_result.skipped
             result["errors"] = sync_result.errors
-            result["failed"] = len(sync_result.errors) > 0
+
+            # Only fail if fail_on_errors is True (default: False)
+            fail_on_errors = validated_args.get("fail_on_errors", False)
+            result["failed"] = fail_on_errors and len(sync_result.errors) > 0
 
             if validated_args.get("return_details"):
                 result["devices"] = list(configs.keys())

@@ -39,3 +39,10 @@ netbox_dry_run: false
 # If true, detailed results will be registered into 'netbox_deploy_results' variable.
 # Otherwise only basic results like created, updated, skipped, errors are registered.
 netbox_return_details: false
+
+# If true, fail the playbook when there are sync errors.
+# If false (default), errors are logged but the playbook continues.
+netbox_fail_on_errors: false
+
+# If true, display a summary of sync results at the end.
+netbox_display_results: true

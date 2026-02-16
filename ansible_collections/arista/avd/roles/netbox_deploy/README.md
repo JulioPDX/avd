@@ -25,10 +25,12 @@ The role synchronizes the following objects from AVD to NetBox:
 
 ## Requirements
 
-This role requires the `httpx` Python library:
+This role requires the `pynetbox` Python library:
 
 ```bash
-pip install httpx
+pip install 'pyavd[netbox]'
+# Or install pynetbox directly
+pip install pynetbox
 ```
 
 ## Example
@@ -70,6 +72,8 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_devices` | All devices | List of specific devices to sync |
 | `netbox_node_type_mapping` | Auto-inferred | Explicit hostname to node type mapping |
 | `netbox_return_details` | `false` | Return detailed sync information |
+| `netbox_fail_on_errors` | `false` | Fail playbook when there are sync errors |
+| `netbox_display_results` | `true` | Display sync results summary at end of role |
 
 ### Directory Configuration
 
@@ -150,8 +154,9 @@ Use `netbox_dry_run: true` or Ansible check mode (`--check`) to preview changes:
 The role is designed to run after `eos_designs` and `eos_cli_config_gen` in a typical AVD workflow:
 
 ```yaml
-- name: Build and Deploy
+- name: Build AVD Configurations
   hosts: FABRIC
+  gather_facts: false
   tasks:
     - name: Generate AVD structured configs
       ansible.builtin.import_role:
@@ -161,14 +166,25 @@ The role is designed to run after `eos_designs` and `eos_cli_config_gen` in a ty
       ansible.builtin.import_role:
         name: arista.avd.eos_cli_config_gen
 
+- name: Sync to NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_site_name: "DC1"
+    root_dir: "{{ playbook_dir }}"
+    structured_dir: "{{ root_dir }}/intended/structured_configs"
+  tasks:
     - name: Deploy to NetBox
       ansible.builtin.import_role:
         name: arista.avd.netbox_deploy
-      vars:
-        netbox_url: "https://netbox.example.com"
-        netbox_token: "{{ vault_netbox_token }}"
-        netbox_site_name: "{{ fabric_name }}"
 ```
+
+> **Note**: The NetBox sync play uses `hosts: localhost` to avoid inheriting
+> network device connection settings from group_vars. Results are automatically
+> displayed by the role when `netbox_display_results: true` (default).
 
 ## License
 

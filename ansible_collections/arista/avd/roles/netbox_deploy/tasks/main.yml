@@ -29,4 +29,24 @@
     create_prerequisites: "{{ netbox_create_prerequisites }}"
     dry_run: "{{ netbox_dry_run }}"
     return_details: "{{ netbox_return_details }}"
+    fail_on_errors: "{{ netbox_fail_on_errors }}"
   register: netbox_deploy_results
+
+- name: Display NetBox sync results
+  run_once: true
+  delegate_to: localhost
+  when: netbox_display_results | default(true)
+  ansible.builtin.debug:
+    msg: |
+      NetBox Sync Results:
+        Created: {{ netbox_deploy_results.created | default(0) }}
+        Updated: {{ netbox_deploy_results.updated | default(0) }}
+        Skipped: {{ netbox_deploy_results.skipped | default(0) }}
+        Errors:  {{ netbox_deploy_results.errors | default([]) | length }}
+      {% if netbox_deploy_results.errors | default([]) %}
+
+      Errors:
+      {% for error in netbox_deploy_results.errors[:10] %}
+        - {{ error }}
+      {% endfor %}
+      {% endif %}

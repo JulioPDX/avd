@@ -47,6 +47,7 @@ mapping via the `node_type_mapping` parameter.
 | <samp>create_prerequisites</samp> | bool | optional | True | - | Automatically create prerequisite objects in NetBox (site, device types,<br>device roles, manufacturers, platforms) if they don&#39;t exist. |
 | <samp>dry_run</samp> | bool | optional | False | - | If true, no changes will be made to NetBox.<br>The module will report what would be created or updated. |
 | <samp>return_details</samp> | bool | optional | False | - | If true, additional details will be returned including the list of devices<br>and their node types. May impact performance for large inventories. |
+| <samp>fail_on_errors</samp> | bool | optional | False | - | If true, the module will report failure when there are sync errors.<br>If false (default), errors are logged but the module reports success,<br>allowing playbooks to continue and display results. |
 
 ## Notes
 

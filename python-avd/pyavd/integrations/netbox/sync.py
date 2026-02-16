@@ -487,6 +487,13 @@ class AVDNetBoxSync:
         vlans = avd_structured_config.get("vlans", [])
         endpoints = self.mapping.get_netbox_endpoints()
 
+        # Get site ID for site-scoped VLAN lookup
+        site_id = None
+        if self.site_name:
+            site = self._find_netbox_object(endpoints["sites"], name=self.site_name)
+            if site:
+                site_id = site["id"]
+
         for vlan in vlans:
             vlan_id = vlan.get("id")
             if not vlan_id:
@@ -494,12 +501,14 @@ class AVDNetBoxSync:
 
             netbox_data = self._transform_avd_to_netbox(vlan, self.mapping.vlan_mappings)
 
-            if self.site_name:
-                site = self._find_netbox_object(endpoints["sites"], name=self.site_name)
-                if site:
-                    netbox_data["site"] = site["id"]
+            if site_id:
+                netbox_data["site"] = site_id
 
-            existing = self._find_netbox_object(endpoints["vlans"], vid=vlan_id)
+            # Look for existing VLAN by VID AND site (or global if no site)
+            if site_id:
+                existing = self._find_netbox_object(endpoints["vlans"], vid=vlan_id, site_id=site_id)
+            else:
+                existing = self._find_netbox_object(endpoints["vlans"], vid=vlan_id)
 
             if self.dry_run:
                 result.skipped += 1
@@ -514,6 +523,9 @@ class AVDNetBoxSync:
                     result.created += 1
             except Exception as e:
                 result.errors.append(f"Failed to sync VLAN {vlan_id}: {e}")
+
+        # Invalidate VLAN cache since we may have created/updated VLANs
+        self._cache.pop("vlans_by_vid_site", None)
 
         return result
 
@@ -1031,8 +1043,11 @@ class AVDNetBoxSync:
 
         device_id = device["id"]
 
-        # Build VLAN lookup cache (vid -> netbox_id)
-        vlan_cache = self._get_or_cache("vlans_by_vid", endpoints["vlans"], "vid")
+        # Get device's site ID to filter VLANs properly
+        device_site_id = self._extract_site_id(device.get("site"))
+
+        # Build site-filtered VLAN lookup cache (vid -> netbox_id)
+        vlan_cache = self._get_site_vlan_cache(endpoints["vlans"], device_site_id)
 
         # Process ethernet interfaces
         for eth in avd_structured_config.get("ethernet_interfaces", []):
@@ -1045,6 +1060,48 @@ class AVDNetBoxSync:
             result = result + intf_result
 
         return result
+
+    def _extract_site_id(self, site_data: Any) -> int | None:
+        """Extract site ID from site data which can be a dict or an int."""
+        if not site_data:
+            return None
+        if isinstance(site_data, dict):
+            return site_data.get("id")
+        return site_data
+
+    def _get_site_vlan_cache(self, vlans_endpoint: str, site_id: int | None) -> dict[int, Any]:
+        """
+        Build a VLAN cache filtered by site.
+
+        Returns VLANs that belong to the specified site or are global (no site).
+
+        Args:
+            vlans_endpoint: NetBox VLAN API endpoint
+            site_id: Site ID to filter by, or None for all VLANs
+
+        Returns:
+            Dict mapping VLAN VID to VLAN object
+        """
+        cache_key = f"vlans_by_vid_site_{site_id}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]  # pyright: ignore[reportReturnType]
+
+        vlan_cache: dict[int, Any] = {}
+        for vlan in self.client.get_all(vlans_endpoint):
+            vid = vlan.get("vid")
+            if not vid:
+                continue
+
+            # Get VLAN's site ID
+            vlan_site_id = self._extract_site_id(vlan.get("site"))
+
+            # Include VLAN if it belongs to the device's site or is global (no site)
+            # Prefer site-specific VLAN over global if there's a conflict
+            if (site_id is None or vlan_site_id is None or vlan_site_id == site_id) and (vid not in vlan_cache or vlan_site_id == site_id):
+                vlan_cache[vid] = vlan
+
+        self._cache[cache_key] = vlan_cache  # pyright: ignore[reportArgumentType]
+        return vlan_cache
 
     def _sync_interface_vlans(
         self,

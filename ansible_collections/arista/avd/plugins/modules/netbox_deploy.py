@@ -87,6 +87,13 @@ options:
       and their node types. May impact performance for large inventories.
     type: bool
     default: false
+  fail_on_errors:
+    description: |-
+      If true, the module will report failure when there are sync errors.
+      If false (default), errors are logged but the module reports success,
+      allowing playbooks to continue and display results.
+    type: bool
+    default: false
 notes:
   - This module requires the 'httpx' Python library. Install with 'pip install httpx'.
   - |-
