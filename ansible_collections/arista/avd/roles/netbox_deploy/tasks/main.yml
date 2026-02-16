@@ -21,7 +21,7 @@
     netbox_token: "{{ netbox_token }}"
     site_name: "{{ netbox_site_name | arista.avd.default(omit) }}"
     site_mapping: "{{ netbox_site_mapping | arista.avd.default(omit) }}"
-    structured_config_dir: "{{ structured_dir }}"
+    structured_config_dir: "{{ structured_dir | arista.avd.default(omit) }}"
     structured_config_suffix: "{{ avd_structured_config_file_format }}"
     device_list: "{{ netbox_devices | arista.avd.default(omit) }}"
     node_type_mapping: "{{ netbox_node_type_mapping | arista.avd.default(omit) }}"
@@ -33,6 +33,9 @@
     fail_on_errors: "{{ netbox_fail_on_errors }}"
     reconcile: "{{ netbox_reconcile }}"
     managed_tag: "{{ netbox_managed_tag }}"
+    use_async: "{{ netbox_use_async }}"
+    max_concurrent: "{{ netbox_max_concurrent }}"
+    purge: "{{ netbox_purge }}"
   register: netbox_deploy_results
 
 - name: Display NetBox sync results

@@ -36,7 +36,8 @@ This integration enables you to document your Arista network fabric in NetBox by
 ```text
 pyavd/integrations/netbox/
 ├── __init__.py      # Public API exports
-├── client.py        # HTTP client for NetBox REST API
+├── async_sync.py    # Async sync logic (AsyncAVDNetBoxSync class) - 4-8x faster
+├── client.py        # HTTP clients for NetBox REST API (sync and async)
 ├── models.py        # Data model mappings (FieldMapping, AVDNetBoxMapping)
 ├── sync.py          # Main sync logic (AVDNetBoxSync class)
 └── transforms.py    # Data transformation functions
@@ -157,6 +158,9 @@ class AVDNetBoxSync:
 
     # Reconciliation
     def reconcile_objects(self, dry_run: bool = None) -> SyncResult
+
+    # Purge - delete ALL objects with managed tag
+    def purge_all(self, dry_run: bool = None) -> SyncResult
 ```
 
 ### SyncResult
@@ -169,6 +173,67 @@ class SyncResult:
     skipped: int = 0      # Items unchanged
     deleted: int = 0      # Items deleted from NetBox (reconciliation)
     errors: list[str]     # Error messages
+```
+
+## Async Mode (High Performance)
+
+For significantly faster sync operations (4-8x speedup), use the async client and sync classes:
+
+```python
+import asyncio
+from pyavd.integrations.netbox import AsyncNetBoxClient, AsyncAVDNetBoxSync
+
+async def sync_to_netbox():
+    async with AsyncNetBoxClient(
+        "https://netbox.example.com",
+        "nbt_xxx.yyy",
+        max_concurrent=10,  # Limit concurrent requests
+    ) as client:
+        sync = AsyncAVDNetBoxSync(
+            client,
+            site_name="DC1",
+            max_concurrent=10,  # Concurrent device processing
+            reconcile=True,
+        )
+        result = await sync.sync_all(configs, node_types)
+        print(f"Created: {result.created}, Updated: {result.updated}")
+
+# Run the async sync
+asyncio.run(sync_to_netbox())
+```
+
+### Performance Comparison
+
+| Mode | 16 Devices | 32 Devices |
+| ---- | ---------- | ---------- |
+| Sync (sequential) | ~16 seconds | ~32 seconds |
+| Async (concurrent) | ~3-4 seconds | ~6-8 seconds |
+
+### AsyncNetBoxClient
+
+```python
+class AsyncNetBoxClient:
+    def __init__(
+        self,
+        url: str,
+        token: str,
+        *,
+        verify_ssl: bool = True,
+        timeout: float = 30.0,
+        max_concurrent: int = 10,  # Semaphore limit for concurrent requests
+    )
+
+    # Async context manager
+    async def __aenter__(self) -> AsyncNetBoxClient
+    async def __aexit__(self, ...)
+
+    # Async HTTP methods
+    async def get(self, endpoint: str, params: dict = None) -> dict
+    async def post(self, endpoint: str, data: dict) -> dict
+    async def patch(self, endpoint: str, data: dict) -> dict
+    async def delete(self, endpoint: str) -> None
+    async def get_all(self, endpoint: str, params: dict = None) -> AsyncIterator[dict]
+    async def get_all_list(self, endpoint: str, params: dict = None) -> list[dict]
 ```
 
 ## Transform Functions
@@ -206,6 +271,37 @@ result = sync.sync_all(configs, node_types)
 
 # Objects with the tag that weren't touched are deleted at the end
 # Deletion order: cables → IPs → interfaces → prefixes → VLANs → VRFs → ASNs → devices
+```
+
+## Purge Mode
+
+The `purge_all()` method deletes **ALL** objects tagged with the managed tag from NetBox
+without performing any sync. This is useful for cleaning up before migration or starting fresh.
+
+```python
+from pyavd.integrations.netbox import NetBoxClient, AVDNetBoxSync
+
+client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
+sync = AVDNetBoxSync(
+    client,
+    managed_tag="avd-managed"  # Only this tag is needed for purge
+)
+
+# Preview what would be deleted
+result = sync.purge_all(dry_run=True)
+print(f"Would delete: {result.skipped} objects")
+
+# Actually delete (destructive!)
+result = sync.purge_all()
+print(f"Deleted: {result.deleted} objects")
+```
+
+Purge also works with the async client:
+
+```python
+async with AsyncNetBoxClient("https://netbox.example.com", "nbt_xxx.yyy") as client:
+    sync = AsyncAVDNetBoxSync(client, managed_tag="avd-managed")
+    result = await sync.purge_all()
 ```
 
 ## Testing

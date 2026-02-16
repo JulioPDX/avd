@@ -79,6 +79,9 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_display_results` | `true` | Display sync results summary at end of role |
 | `netbox_reconcile` | `false` | Delete orphaned objects from NetBox |
 | `netbox_managed_tag` | `avd-managed` | Tag name for AVD-managed objects |
+| `netbox_use_async` | `true` | Use async HTTP client for better performance (4-8x faster) |
+| `netbox_max_concurrent` | `10` | Maximum concurrent API requests when using async mode |
+| `netbox_purge` | `false` | Delete ALL objects with managed tag (destructive) |
 
 ### Directory Configuration
 
@@ -267,6 +270,76 @@ Objects are deleted in reverse dependency order to avoid foreign key errors:
 
 > **Warning**: Use `netbox_dry_run: true` first to preview what would be deleted before
 > enabling reconciliation in production.
+
+## Purge Mode
+
+The `netbox_purge: true` option deletes **ALL** objects tagged with `netbox_managed_tag` from NetBox
+without performing any sync. This is useful for:
+
+- Cleaning up a NetBox instance before migrating to a different source of truth
+- Starting fresh when restructuring your AVD configurations
+- Removing all AVD-managed data before decommissioning a fabric
+
+### Example: Purge All AVD-Managed Objects
+
+```yaml
+- name: Purge AVD objects from NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_purge: true  # Delete ALL avd-managed objects
+  tasks:
+    - name: Purge NetBox
+      ansible.builtin.import_role:
+        name: arista.avd.netbox_deploy
+```
+
+> **Warning**: This is a destructive operation. Use `netbox_dry_run: true` first to preview
+> what would be deleted.
+
+When purge mode is enabled:
+
+- `structured_config_dir` and `site_name`/`site_mapping` are not required
+- Objects are deleted in reverse dependency order (cables → IPs → interfaces → etc.)
+- Only objects with the managed tag are affected; manually-created objects are preserved
+
+## Performance
+
+The role uses async HTTP requests by default for significantly better performance. With async mode enabled
+(`netbox_use_async: true`, the default), multiple devices are synced concurrently, resulting in 4-8x faster
+sync times compared to sequential processing.
+
+| Mode | 16 Devices | 32 Devices |
+| ---- | ---------- | ---------- |
+| Sync (sequential) | ~16 seconds | ~32 seconds |
+| Async (concurrent) | ~3-4 seconds | ~6-8 seconds |
+
+### Tuning Concurrency
+
+The `netbox_max_concurrent` parameter controls how many API requests can be made simultaneously:
+
+- **Lower values** (5-10): Safer for shared NetBox instances, less server load
+- **Higher values** (20-50): Faster sync but may overwhelm the NetBox server
+
+```yaml
+- name: High-performance sync
+  ansible.builtin.import_role:
+    name: arista.avd.netbox_deploy
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_site_name: "DC1"
+    netbox_max_concurrent: 20  # Increase for faster sync
+```
+
+To disable async mode (use sequential processing):
+
+```yaml
+netbox_use_async: false
+```
 
 ## License
 

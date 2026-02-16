@@ -55,3 +55,17 @@ netbox_reconcile: false
 # Tag name to mark AVD-managed objects in NetBox. Objects with this tag that
 # aren't touched during sync will be deleted if netbox_reconcile is true.
 netbox_managed_tag: "avd-managed"
+
+# If true, use async HTTP client for better performance (4-8x faster).
+# Async mode processes multiple devices concurrently.
+netbox_use_async: true
+
+# Maximum concurrent API requests when using async mode.
+# Higher values may improve performance but could overwhelm the NetBox server.
+netbox_max_concurrent: 10
+
+# If true, delete ALL objects with managed_tag from NetBox without syncing.
+# This is a destructive operation that removes all AVD-managed objects.
+# Useful for cleaning up a NetBox instance before migration or starting fresh.
+# When purge is true, structured_config_dir and site_name/site_mapping are not required.
+netbox_purge: false

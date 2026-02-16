@@ -19,13 +19,16 @@ Example usage:
         print(f"Created: {result.created}, Updated: {result.updated}")
 """
 
-from .client import NetBoxAPIError, NetBoxAuthError, NetBoxClient, NetBoxClientError
+from .async_sync import AsyncAVDNetBoxSync
+from .client import AsyncNetBoxClient, NetBoxAPIError, NetBoxAuthError, NetBoxClient, NetBoxClientError
 from .models import AVDNetBoxMapping, FieldMapping
 from .sync import AVDNetBoxSync, SyncResult
 
 __all__ = [
     "AVDNetBoxMapping",
     "AVDNetBoxSync",
+    "AsyncAVDNetBoxSync",
+    "AsyncNetBoxClient",
     "FieldMapping",
     "NetBoxAPIError",
     "NetBoxAuthError",

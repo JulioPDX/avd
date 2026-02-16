@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -15,13 +16,13 @@ from yaml import load
 from ansible_collections.arista.avd.plugins.plugin_utils.utils import YamlLoader
 
 if TYPE_CHECKING:
-    from pyavd.integrations.netbox import AVDNetBoxSync, NetBoxClient
+    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient, AVDNetBoxSync, NetBoxClient
 
 PLUGIN_NAME = "arista.avd.netbox_deploy"
 
 try:
     from pyavd._utils import strip_empties_from_dict
-    from pyavd.integrations.netbox import AVDNetBoxSync, NetBoxClient
+    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient, AVDNetBoxSync, NetBoxClient
 
     HAS_PYAVD = True
 except ImportError:
@@ -43,7 +44,7 @@ ARGUMENT_SPEC = {
     "netbox_token": {"type": "str", "secret": True, "required": True},
     "site_name": {"type": "str", "required": False},
     "site_mapping": {"type": "dict", "required": False},
-    "structured_config_dir": {"type": "str", "required": True},
+    "structured_config_dir": {"type": "str", "required": False},  # Not required when purge=True
     "structured_config_suffix": {"type": "str", "default": "yml"},
     "device_list": {"type": "list", "elements": "str", "required": False},
     "node_type_mapping": {"type": "dict", "required": False},
@@ -55,6 +56,9 @@ ARGUMENT_SPEC = {
     "fail_on_errors": {"type": "bool", "default": False},
     "reconcile": {"type": "bool", "default": False},
     "managed_tag": {"type": "str", "default": "avd-managed"},
+    "use_async": {"type": "bool", "default": True},
+    "max_concurrent": {"type": "int", "default": 10},
+    "purge": {"type": "bool", "default": False},
 }
 
 
@@ -114,12 +118,23 @@ class ActionModule(ActionBase):
         return self.deploy(validated_args, result)
 
     def deploy(self, validated_args: dict, result: dict) -> dict:
-        """Load configs and perform NetBox sync."""
-        # Validate site_name or site_mapping is provided
+        """Load configs and perform NetBox sync or purge."""
+        purge_mode = validated_args.get("purge", False)
+
+        # Purge mode: delete all AVD-managed objects, skip sync
+        if purge_mode:
+            return self._run_purge(validated_args, result)
+
+        # Normal sync mode: validate site_name or site_mapping is provided
         site_name = validated_args.get("site_name")
         site_mapping = validated_args.get("site_mapping")
         if not site_name and not site_mapping:
             msg = "Either 'site_name' or 'site_mapping' must be provided"
+            raise AnsibleActionFail(msg)
+
+        # Validate structured_config_dir is provided for sync mode
+        if not validated_args.get("structured_config_dir"):
+            msg = "'structured_config_dir' is required when purge=False"
             raise AnsibleActionFail(msg)
 
         try:
@@ -138,25 +153,13 @@ class ActionModule(ActionBase):
 
             # Check for dry_run / check_mode
             dry_run = validated_args.get("dry_run", False) or self._play_context.check_mode
+            use_async = validated_args.get("use_async", True)
 
             # Connect to NetBox and sync
-            with NetBoxClient(
-                url=validated_args["netbox_url"],
-                token=validated_args["netbox_token"],
-                verify_ssl=validated_args.get("verify_ssl", True),
-                timeout=validated_args.get("timeout", 30.0),
-            ) as client:
-                sync = AVDNetBoxSync(
-                    client=client,
-                    site_name=site_name,
-                    site_mapping=site_mapping,
-                    dry_run=dry_run,
-                    create_prerequisites=validated_args.get("create_prerequisites", True),
-                    reconcile=validated_args.get("reconcile", False),
-                    managed_tag=validated_args.get("managed_tag"),
-                )
-
-                sync_result = sync.sync_all(configs, node_types)
+            if use_async:
+                sync_result = self._run_async_sync(validated_args, configs, node_types, site_name, site_mapping, dry_run)
+            else:
+                sync_result = self._run_sync(validated_args, configs, node_types, site_name, site_mapping, dry_run)
 
             # Populate result
             result["changed"] = sync_result.created > 0 or sync_result.updated > 0 or sync_result.deleted > 0
@@ -189,6 +192,138 @@ class ActionModule(ActionBase):
             result["msg"] = f"NetBox sync failed: {e}"
 
         return result
+
+    def _run_purge(self, validated_args: dict, result: dict) -> dict:
+        """Delete all AVD-managed objects from NetBox."""
+        dry_run = validated_args.get("dry_run", False) or self._play_context.check_mode
+        use_async = validated_args.get("use_async", True)
+
+        try:
+            purge_result = self._run_async_purge(validated_args, dry_run) if use_async else self._run_sync_purge(validated_args, dry_run)
+
+            result["changed"] = purge_result.deleted > 0
+            result["created"] = 0
+            result["updated"] = 0
+            result["skipped"] = purge_result.skipped
+            result["deleted"] = purge_result.deleted
+            result["errors"] = purge_result.errors
+
+            fail_on_errors = validated_args.get("fail_on_errors", False)
+            result["failed"] = fail_on_errors and len(purge_result.errors) > 0
+
+            if validated_args.get("return_details"):
+                result["dry_run"] = dry_run
+                result["purge"] = True
+
+            if purge_result.errors:
+                result["msg"] = f"Purge completed with {len(purge_result.errors)} error(s)"
+            elif dry_run:
+                result["msg"] = f"Purge dry run: {purge_result.skipped} objects would be deleted"
+            else:
+                result["msg"] = f"Purge completed: {purge_result.deleted} objects deleted"
+
+        except Exception as e:
+            LOGGER.exception("NetBox purge failed")
+            result["failed"] = True
+            result["msg"] = f"NetBox purge failed: {e}"
+
+        return result
+
+    def _run_sync_purge(self, validated_args: dict, dry_run: bool) -> Any:
+        """Run synchronous purge."""
+        with NetBoxClient(
+            url=validated_args["netbox_url"],
+            token=validated_args["netbox_token"],
+            verify_ssl=validated_args.get("verify_ssl", True),
+            timeout=validated_args.get("timeout", 30.0),
+        ) as client:
+            sync = AVDNetBoxSync(
+                client=client,
+                dry_run=dry_run,
+                managed_tag=validated_args.get("managed_tag"),
+            )
+            return sync.purge_all()
+
+    def _run_async_purge(self, validated_args: dict, dry_run: bool) -> Any:
+        """Run async purge using asyncio.run()."""
+
+        async def _async_purge() -> Any:
+            async with AsyncNetBoxClient(
+                url=validated_args["netbox_url"],
+                token=validated_args["netbox_token"],
+                verify_ssl=validated_args.get("verify_ssl", True),
+                timeout=validated_args.get("timeout", 30.0),
+                max_concurrent=validated_args.get("max_concurrent", 10),
+            ) as client:
+                sync = AsyncAVDNetBoxSync(
+                    client=client,
+                    dry_run=dry_run,
+                    managed_tag=validated_args.get("managed_tag"),
+                    max_concurrent=validated_args.get("max_concurrent", 10),
+                )
+                return await sync.purge_all()
+
+        return asyncio.run(_async_purge())
+
+    def _run_sync(
+        self,
+        validated_args: dict,
+        configs: dict,
+        node_types: dict,
+        site_name: str | None,
+        site_mapping: dict | None,
+        dry_run: bool,
+    ) -> Any:
+        """Run synchronous sync."""
+        with NetBoxClient(
+            url=validated_args["netbox_url"],
+            token=validated_args["netbox_token"],
+            verify_ssl=validated_args.get("verify_ssl", True),
+            timeout=validated_args.get("timeout", 30.0),
+        ) as client:
+            sync = AVDNetBoxSync(
+                client=client,
+                site_name=site_name,
+                site_mapping=site_mapping,
+                dry_run=dry_run,
+                create_prerequisites=validated_args.get("create_prerequisites", True),
+                reconcile=validated_args.get("reconcile", False),
+                managed_tag=validated_args.get("managed_tag"),
+            )
+            return sync.sync_all(configs, node_types)
+
+    def _run_async_sync(
+        self,
+        validated_args: dict,
+        configs: dict,
+        node_types: dict,
+        site_name: str | None,
+        site_mapping: dict | None,
+        dry_run: bool,
+    ) -> Any:
+        """Run async sync using asyncio.run()."""
+
+        async def _async_sync() -> Any:
+            async with AsyncNetBoxClient(
+                url=validated_args["netbox_url"],
+                token=validated_args["netbox_token"],
+                verify_ssl=validated_args.get("verify_ssl", True),
+                timeout=validated_args.get("timeout", 30.0),
+                max_concurrent=validated_args.get("max_concurrent", 10),
+            ) as client:
+                sync = AsyncAVDNetBoxSync(
+                    client=client,
+                    site_name=site_name,
+                    site_mapping=site_mapping,
+                    dry_run=dry_run,
+                    create_prerequisites=validated_args.get("create_prerequisites", True),
+                    reconcile=validated_args.get("reconcile", False),
+                    managed_tag=validated_args.get("managed_tag"),
+                    max_concurrent=validated_args.get("max_concurrent", 10),
+                )
+                return await sync.sync_all(configs, node_types)
+
+        return asyncio.run(_async_sync())
 
     def _load_structured_configs(
         self,

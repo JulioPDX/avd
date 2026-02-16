@@ -1522,6 +1522,82 @@ class AVDNetBoxSync:
 
         return result
 
+    def purge_all(self, dry_run: bool | None = None) -> SyncResult:
+        """
+        Delete ALL objects with the managed tag from NetBox.
+
+        This is a destructive operation that removes all AVD-managed objects
+        without performing any sync. Useful for cleaning up a NetBox instance
+        before migrating to a different source of truth or starting fresh.
+
+        Objects are deleted in reverse dependency order to avoid foreign key errors:
+        cables → IPs → interfaces → prefixes → VLANs → VRFs → ASNs → devices
+
+        Args:
+            dry_run: If True, don't actually delete, just count what would be deleted.
+                    Overrides instance dry_run setting.
+
+        Returns:
+            SyncResult with deletion counts in the 'deleted' field
+        """
+        result = SyncResult()
+        use_dry_run = dry_run if dry_run is not None else self.dry_run
+
+        tag_id = self._ensure_managed_tag()
+        if not tag_id:
+            LOGGER.info("No managed tag '%s' found - nothing to purge", self.managed_tag)
+            return result
+
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Deletion order (reverse dependencies)
+        deletion_order = [
+            ("cables", endpoints["cables"]),
+            ("ip_addresses", endpoints["ip_addresses"]),
+            ("interfaces", endpoints["interfaces"]),
+            ("prefixes", endpoints["prefixes"]),
+            ("vlans", endpoints["vlans"]),
+            ("vrfs", endpoints["vrfs"]),
+            ("asns", endpoints["asns"]),
+            ("devices", endpoints["devices"]),
+        ]
+
+        LOGGER.info("Purging all objects with tag '%s' from NetBox...", self.managed_tag)
+
+        for object_type, endpoint in deletion_order:
+            params = {"tag": self.managed_tag}
+            to_delete = list(self.client.get_all(endpoint, params=params))
+
+            if not to_delete:
+                continue
+
+            LOGGER.info("Purging %d %s...", len(to_delete), object_type)
+
+            for obj in to_delete:
+                obj_id = obj.get("id")
+                obj_name = obj.get("name") or obj.get("display") or obj.get("address") or str(obj_id)
+
+                if use_dry_run:
+                    LOGGER.info("[DRY RUN] Would delete %s: %s", object_type, obj_name)
+                    result.skipped += 1
+                    continue
+
+                try:
+                    self.client.delete(f"{endpoint}{obj_id}/")
+                    result.deleted += 1
+                    LOGGER.debug("Deleted %s: %s", object_type, obj_name)
+                except Exception as e:
+                    error_msg = f"Failed to delete {object_type} {obj_name}: {e}"
+                    result.errors.append(error_msg)
+                    LOGGER.warning(error_msg)
+
+        if use_dry_run:
+            LOGGER.info("Purge dry run complete: %d objects would be deleted", result.skipped)
+        else:
+            LOGGER.info("Purge complete: %d deleted, %d errors", result.deleted, len(result.errors))
+
+        return result
+
     def sync_all(
         self,
         avd_structured_configs: dict[str, dict[str, Any]],
