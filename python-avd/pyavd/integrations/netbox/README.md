@@ -35,12 +35,15 @@ This integration enables you to document your Arista network fabric in NetBox by
 
 ```text
 pyavd/integrations/netbox/
-├── __init__.py      # Public API exports
-├── async_sync.py    # Async sync logic (AsyncAVDNetBoxSync class) - 4-8x faster
-├── client.py        # HTTP clients for NetBox REST API (sync and async)
-├── models.py        # Data model mappings (FieldMapping, AVDNetBoxMapping)
-├── sync.py          # Main sync logic (AVDNetBoxSync class)
-└── transforms.py    # Data transformation functions
+├── __init__.py          # Public API exports
+├── async_sync.py        # Main async sync class (AsyncAVDNetBoxSync) - 4-8x faster
+├── async_device.py      # Async device sync mixin methods
+├── async_helpers.py     # Async helper methods (caching, tags, library integration)
+├── async_interface.py   # Async interface/IP sync mixin methods
+├── client.py            # HTTP clients for NetBox REST API (sync and async)
+├── models.py            # Data model mappings (FieldMapping, AVDNetBoxMapping)
+├── sync.py              # Main sync logic (AVDNetBoxSync class)
+└── transforms.py        # Data transformation functions
 ```
 
 ### Key Components
@@ -135,6 +138,8 @@ class AVDNetBoxSync:
         create_prerequisites: bool = False,
         managed_tag: str = "avd-managed",     # Tag for reconciliation
         reconcile: bool = False,              # Delete orphaned objects
+        devicetype_library_url: str = None,   # URL to fetch device types from library
+        platform_mapping: dict[str, str] = None,  # Map AVD platform to library model
     )
 
     # Main entry point - syncs everything
@@ -303,6 +308,42 @@ async with AsyncNetBoxClient("https://netbox.example.com", "nbt_xxx.yyy") as cli
     sync = AsyncAVDNetBoxSync(client, managed_tag="avd-managed")
     result = await sync.purge_all()
 ```
+
+## Device Type Library Integration
+
+The integration can optionally fetch device type definitions from the
+[NetBox Community Device Type Library](https://github.com/netbox-community/devicetype-library)
+to create detailed device types with physical specifications (u_height, weight, airflow, etc.).
+
+```python
+from pyavd.integrations.netbox import NetBoxClient, AVDNetBoxSync
+
+client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
+sync = AVDNetBoxSync(
+    client,
+    site_name="DC1",
+    # Enable device type library fetch
+    devicetype_library_url="https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista",
+    # Optional: map AVD platform names to library model names
+    platform_mapping={
+        "7050SX3": "DCS-7050SX3-48YC12-F",
+        "720XP": "DCS-720XP-48ZC6-F",
+        "7280SR3": "DCS-7280SR3-48YC8-F",
+    }
+)
+
+result = sync.sync_all(configs, node_types)
+```
+
+When a device is synced:
+
+1. The AVD `metadata.platform` value is used to look up the device type
+2. If `devicetype_library_url` is set, the integration fetches the definition from the library
+3. If a `platform_mapping` entry exists, the mapped model name is used for lookup
+4. The device type is created with full physical specs from the library definition
+5. If library fetch fails or no URL is set, a simple device type is created
+
+This feature is disabled by default (no internet access required).
 
 ## Testing
 

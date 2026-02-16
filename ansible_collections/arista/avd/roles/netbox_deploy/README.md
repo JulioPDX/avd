@@ -82,6 +82,8 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_use_async` | `true` | Use async HTTP client for better performance (4-8x faster) |
 | `netbox_max_concurrent` | `10` | Maximum concurrent API requests when using async mode |
 | `netbox_purge` | `false` | Delete ALL objects with managed tag (destructive) |
+| `netbox_devicetype_library_url` | - | URL for NetBox Community Device Type Library (disabled by default) |
+| `netbox_platform_mapping` | - | Dict mapping AVD platform names to library device type model names |
 
 ### Directory Configuration
 
@@ -303,6 +305,47 @@ When purge mode is enabled:
 - `structured_config_dir` and `site_name`/`site_mapping` are not required
 - Objects are deleted in reverse dependency order (cables → IPs → interfaces → etc.)
 - Only objects with the managed tag are affected; manually-created objects are preserved
+
+## Device Type Library Integration
+
+The role can optionally fetch device type definitions from the
+[NetBox Community Device Type Library](https://github.com/netbox-community/devicetype-library)
+to create detailed device types with physical specifications (u_height, weight, airflow, etc.).
+
+### Enabling Library Fetch
+
+Set `netbox_devicetype_library_url` to enable fetching device types from the library:
+
+```yaml
+- name: Sync with device type library
+  ansible.builtin.import_role:
+    name: arista.avd.netbox_deploy
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_site_name: "DC1"
+    netbox_devicetype_library_url: "https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista"
+```
+
+### Platform Mapping
+
+AVD uses short platform names (e.g., `7050SX3`) while the library uses full model names
+(e.g., `DCS-7050SX3-48YC12-F`). Use `netbox_platform_mapping` to map AVD platform names to
+library model names:
+
+```yaml
+netbox_devicetype_library_url: "https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista"
+netbox_platform_mapping:
+  "7050SX3": "DCS-7050SX3-48YC12-F"
+  "720XP": "DCS-720XP-48ZC6-F"
+  "7280SR3": "DCS-7280SR3-48YC8-F"
+```
+
+### Offline Environments
+
+By default, the library fetch is disabled (no internet access required). The role will
+create simple device types using the AVD `metadata.platform` value. To explicitly disable
+library fetch, omit `netbox_devicetype_library_url` or don't define it.
 
 ## Performance
 

@@ -73,3 +73,18 @@ netbox_max_concurrent: 10
 # Useful for cleaning up a NetBox instance before migration or starting fresh.
 # When purge is true, structured_config_dir and site_name/site_mapping are not required.
 netbox_purge: false
+
+# NetBox Community Device Type Library URL.
+# When set, the role will attempt to fetch device type definitions from the library
+# to create more detailed device types with physical specs (u_height, weight, etc.).
+# Set to null/omit to disable (default) - useful for environments without internet access.
+# Example: https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista
+# netbox_devicetype_library_url: null
+
+# Mapping from AVD platform names to NetBox Community Device Type Library model names.
+# AVD uses short platform names (e.g., "7050SX3") while the library uses full model
+# names (e.g., "DCS-7050SX3-48YC12-F"). This mapping allows the library lookup to work.
+# netbox_platform_mapping:
+#   "7050SX3": "DCS-7050SX3-48YC12-F"
+#   "720XP": "DCS-720XP-48ZC6-F"
+#   "vEOS-lab": "vEOS"

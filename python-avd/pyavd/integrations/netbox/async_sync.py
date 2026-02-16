@@ -16,9 +16,11 @@ import ipaddress
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .models import NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping
-from .sync import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, SyncResult
-from .transforms import get_nested_value, map_interface_mode, map_interface_type, slugify
+from .async_device import AsyncDeviceMixin
+from .async_helpers import AsyncHelpersMixin
+from .async_interface import AsyncInterfaceMixin
+from .models import AVDNetBoxMapping
+from .sync import SyncResult
 
 if TYPE_CHECKING:
     from .client import AsyncNetBoxClient
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-class AsyncAVDNetBoxSync:
+class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixin):
     """
     Async synchronization of AVD structured configuration to NetBox.
 
@@ -43,6 +45,8 @@ class AsyncAVDNetBoxSync:
         managed_tag: Tag name to mark AVD-managed objects (default: "avd-managed")
         reconcile: If True, delete objects with managed_tag that weren't synced
         max_concurrent: Maximum concurrent operations per phase (default: 10)
+        devicetype_library_url: Base URL for NetBox Community Device Type Library (set to None to disable)
+        platform_mapping: Dict mapping AVD platform names to library device type model names
     """
 
     DEFAULT_MANAGED_TAG = "avd-managed"
@@ -59,6 +63,8 @@ class AsyncAVDNetBoxSync:
         managed_tag: str | None = None,
         reconcile: bool = False,
         max_concurrent: int = 10,
+        devicetype_library_url: str | None = None,
+        platform_mapping: dict[str, str] | None = None,
     ) -> None:
         self.client = client
         self.mapping = mapping or AVDNetBoxMapping()
@@ -69,12 +75,17 @@ class AsyncAVDNetBoxSync:
         self.managed_tag = managed_tag or self.DEFAULT_MANAGED_TAG
         self.reconcile = reconcile
         self.max_concurrent = max_concurrent
+        self.devicetype_library_url = devicetype_library_url
+        self.platform_mapping = platform_mapping or {}
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._cache: dict[str, dict[str, Any]] = {}
         self._prerequisites_created = False
         self._site_cache: dict[str, dict[str, Any]] = {}
         self._managed_tag_id: int | None = None
         self._cache_lock = asyncio.Lock()
+        self._prerequisite_lock = asyncio.Lock()
+        self._devicetype_library_cache: dict[str, dict[str, Any] | None] = {}
+        self._library_lock = asyncio.Lock()
 
         # Track objects touched during sync for reconciliation
         self._touched_objects: dict[str, set[int]] = {
@@ -88,419 +99,11 @@ class AsyncAVDNetBoxSync:
             "asns": set(),
         }
 
-    async def _get_or_cache(self, cache_key: str, endpoint: str, lookup_field: str) -> dict[str, Any]:
-        """Get cached lookup table or fetch from NetBox."""
-        async with self._cache_lock:
-            if cache_key not in self._cache:
-                self._cache[cache_key] = {}
-                async for obj in self.client.get_all(endpoint):
-                    key = get_nested_value(obj, lookup_field)
-                    if key:
-                        self._cache[cache_key][key] = obj
-        return self._cache[cache_key]
-
-    async def _find_netbox_object(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
-        """Find a single object in NetBox by query parameters."""
-        response = await self.client.get(endpoint, params=kwargs)
-        results = response.get("results", [])
-        return results[0] if results else None
-
-    async def _ensure_prerequisites(self) -> None:
-        """Ensure required objects exist in NetBox (manufacturer, device type, roles)."""
-        if self._prerequisites_created or not self.create_prerequisites:
-            return
-
-        endpoints = self.mapping.get_netbox_endpoints()
-
-        # Create manufacturer if needed
-        existing = await self._find_netbox_object(endpoints["manufacturers"], slug=DEFAULT_MANUFACTURER["slug"])
-        if not existing and not self.dry_run:
-            await self.client.post(endpoints["manufacturers"], DEFAULT_MANUFACTURER)
-            LOGGER.info("Created manufacturer: %s", DEFAULT_MANUFACTURER["name"])
-
-        # Create device type if needed
-        existing = await self._find_netbox_object(endpoints["device_types"], slug=DEFAULT_DEVICE_TYPE["slug"])
-        if not existing and not self.dry_run:
-            mfr = await self._find_netbox_object(endpoints["manufacturers"], slug=DEFAULT_MANUFACTURER["slug"])
-            if mfr:
-                device_type_data = {**DEFAULT_DEVICE_TYPE, "manufacturer": mfr["id"]}
-                await self.client.post(endpoints["device_types"], device_type_data)
-                LOGGER.info("Created device type: %s", DEFAULT_DEVICE_TYPE["model"])
-
-        # Create device roles
-        for role_name in NODE_TYPE_TO_DEVICE_ROLE.values():
-            role_slug = slugify(role_name)
-            existing = await self._find_netbox_object(endpoints["device_roles"], slug=role_slug)
-            if not existing and not self.dry_run:
-                await self.client.post(endpoints["device_roles"], {"name": role_name, "slug": role_slug})
-                LOGGER.info("Created device role: %s", role_name)
-
-        self._prerequisites_created = True
-
-    async def _ensure_managed_tag(self) -> int | None:
-        """Ensure the managed tag exists and return its ID."""
-        if self._managed_tag_id:
-            return self._managed_tag_id
-
-        endpoints = self.mapping.get_netbox_endpoints()
-        tag_slug = slugify(self.managed_tag)
-
-        existing = await self._find_netbox_object(endpoints["tags"], slug=tag_slug)
-        if existing:
-            self._managed_tag_id = existing["id"]
-            return self._managed_tag_id
-
-        try:
-            tag_data = {
-                "name": self.managed_tag,
-                "slug": tag_slug,
-                "color": "0077ff",
-                "description": "Objects managed by AVD NetBox sync - do not modify manually",
-            }
-            tag = await self.client.post(endpoints["tags"], tag_data)
-            self._managed_tag_id = tag["id"]
-            LOGGER.info("Created managed tag: %s", self.managed_tag)
-        except Exception as e:
-            LOGGER.warning("Failed to create managed tag: %s", e)
-            return None
-        else:
-            return self._managed_tag_id
-
-    async def _apply_managed_tag(self, endpoint: str, obj_id: int) -> bool:
-        """Apply the managed tag to an object."""
-        if self.dry_run:
-            return False
-
-        tag_id = await self._ensure_managed_tag()
-        if not tag_id:
-            return False
-
-        try:
-            obj = await self.client.get(f"{endpoint}{obj_id}/")
-            current_tags = obj.get("tags", [])
-            current_tag_ids = [t["id"] if isinstance(t, dict) else t for t in current_tags]
-            if tag_id in current_tag_ids:
-                return True
-
-            new_tags = [*current_tag_ids, tag_id]
-            await self.client.patch(f"{endpoint}{obj_id}/", {"tags": new_tags})
-        except Exception as e:
-            LOGGER.debug("Failed to apply managed tag to %s%s: %s", endpoint, obj_id, e)
-            return False
-        else:
-            return True
-
-    def _track_object(self, obj_type: str, obj_id: int) -> None:
-        """Track an object as touched during this sync."""
-        if obj_type in self._touched_objects:
-            self._touched_objects[obj_type].add(obj_id)
-
-    async def _get_site_for_hostname(self, hostname: str) -> dict[str, Any] | None:
-        """Determine the appropriate site for a hostname based on site_mapping or default site_name."""
-        target_site_name = self.site_name
-
-        for prefix, site_name in self.site_mapping.items():
-            if hostname.lower().startswith(prefix.lower()):
-                target_site_name = site_name
-                break
-
-        if not target_site_name:
-            return None
-
-        return await self._get_or_create_site(target_site_name)
-
-    async def _get_or_create_site(self, site_name: str) -> dict[str, Any] | None:
-        """Get or create a site by name."""
-        if site_name in self._site_cache:
-            return self._site_cache[site_name]
-
-        endpoints = self.mapping.get_netbox_endpoints()
-        existing = await self._find_netbox_object(endpoints["sites"], name=site_name)
-
-        if existing:
-            self._site_cache[site_name] = existing
-            return existing
-
-        if self.create_prerequisites and not self.dry_run:
-            site_data = {"name": site_name, "slug": slugify(site_name)}
-            new_site = await self.client.post(endpoints["sites"], site_data)
-            self._site_cache[site_name] = new_site
-            LOGGER.info("Created site: %s", site_name)
-            return new_site
-
-        return None
-
-    async def _sync_single_device(
-        self,
-        hostname: str,
-        config: dict[str, Any],
-        node_type: str | None,
-        endpoints: dict[str, str],
-    ) -> SyncResult:
-        """Sync a single device and its interfaces (used for concurrent sync)."""
-        async with self._semaphore:
-            result = SyncResult()
-
-            try:
-                # Sync device
-                device_result = await self._sync_device_async(config, node_type, endpoints)
-                result = result + device_result
-
-                # Sync interfaces for this device
-                interfaces_result = await self._sync_interfaces_async(config, endpoints)
-                result = result + interfaces_result
-
-                LOGGER.debug("Synced device %s: created=%d, updated=%d", hostname, result.created, result.updated)
-            except Exception as e:
-                error_msg = f"Failed to sync device {hostname}: {e}"
-                result.errors.append(error_msg)
-                LOGGER.warning(error_msg)
-
-            return result
-
-    async def _sync_device_async(
-        self,
-        avd_structured_config: dict[str, Any],
-        node_type: str | None,
-        endpoints: dict[str, str],
-    ) -> SyncResult:
-        """Sync a single device to NetBox."""
-        result = SyncResult()
-        hostname = avd_structured_config.get("hostname")
-        if not hostname:
-            return result
-
-        # Get or create site for this device
-        site = await self._get_site_for_hostname(hostname)
-        site_id = site["id"] if site else None
-
-        # Determine device role
-        if not node_type:
-            node_type = self._infer_node_type(hostname)
-        role_name = NODE_TYPE_TO_DEVICE_ROLE.get(node_type, "Unknown")
-        role_slug = slugify(role_name)
-
-        # Build device data
-        device_data: dict[str, Any] = {"name": hostname, "status": "active"}
-
-        if site_id:
-            device_data["site"] = site_id
-
-        # Get role ID
-        roles_cache = await self._get_or_cache("device_roles", endpoints["device_roles"], "slug")
-        role = roles_cache.get(role_slug)
-        if role:
-            device_data["role"] = role["id"]
-
-        # Get device type ID
-        types_cache = await self._get_or_cache("device_types", endpoints["device_types"], "slug")
-        device_type = types_cache.get(DEFAULT_DEVICE_TYPE["slug"])
-        if device_type:
-            device_data["device_type"] = device_type["id"]
-
-        # Check for existing device
-        existing = await self._find_netbox_object(endpoints["devices"], name=hostname)
-
-        if self.dry_run:
-            result.skipped += 1
-            return result
-
-        try:
-            if existing:
-                await self.client.patch(f"{endpoints['devices']}{existing['id']}/", device_data)
-                result.updated += 1
-                device_id = existing["id"]
-            else:
-                new_device = await self.client.post(endpoints["devices"], device_data)
-                result.created += 1
-                device_id = new_device["id"]
-
-            self._track_object("devices", device_id)
-            await self._apply_managed_tag(endpoints["devices"], device_id)
-        except Exception as e:
-            error_msg = f"Failed to sync device {hostname}: {e}"
-            result.errors.append(error_msg)
-            LOGGER.warning(error_msg)
-
-        return result
-
-    def _infer_node_type(self, hostname: str) -> str:
-        """Infer AVD node type from hostname patterns."""
-        hostname_lower = hostname.lower()
-
-        if "spine" in hostname_lower:
-            if "l2" in hostname_lower:
-                return "l2spine"
-            if "l3" in hostname_lower:
-                return "l3spine"
-            return "spine"
-        if "leaf" in hostname_lower:
-            return "l2leaf" if hostname_lower.endswith("c") else "l3leaf"
-        if "-pe" in hostname_lower or hostname_lower.startswith("pe"):
-            return "pe"
-        if "-rr" in hostname_lower or hostname_lower.startswith("rr"):
-            return "rr"
-        if "-p" in hostname_lower:
-            return "p"
-        if "wan" in hostname_lower:
-            return "wan_router"
-
-        return "l3leaf"
-
-    async def _sync_interfaces_async(
-        self,
-        avd_structured_config: dict[str, Any],
-        endpoints: dict[str, str],
-    ) -> SyncResult:
-        """Sync all interfaces for a device."""
-        result = SyncResult()
-        hostname = avd_structured_config.get("hostname")
-        if not hostname:
-            return result
-
-        device = await self._find_netbox_object(endpoints["devices"], name=hostname)
-        if not device:
-            return result
-
-        device_id = device["id"]
-
-        # Collect all interface types
-        interface_types = [
-            "ethernet_interfaces",
-            "loopback_interfaces",
-            "vlan_interfaces",
-            "port_channel_interfaces",
-            "management_interfaces",
-        ]
-
-        for intf_type in interface_types:
-            interfaces = avd_structured_config.get(intf_type, [])
-            for interface in interfaces:
-                intf_result = await self._sync_single_interface(interface, device_id, endpoints)
-                result = result + intf_result
-
-        return result
-
-    async def _sync_single_interface(
-        self,
-        interface_data: dict[str, Any],
-        device_id: int,
-        endpoints: dict[str, str],
-    ) -> SyncResult:
-        """Sync a single interface to NetBox."""
-        result = SyncResult()
-        intf_name = interface_data.get("name")
-        if not intf_name:
-            return result
-
-        # Build interface data
-        netbox_data: dict[str, Any] = {
-            "device": device_id,
-            "name": intf_name,
-            "type": map_interface_type(intf_name),
-        }
-
-        # Add description if present
-        if "description" in interface_data:
-            netbox_data["description"] = interface_data["description"]
-
-        # Add enabled status (inverse of shutdown)
-        if "shutdown" in interface_data:
-            netbox_data["enabled"] = not interface_data["shutdown"]
-
-        # Add mode from switchport config
-        switchport = interface_data.get("switchport", {})
-        if switchport.get("mode"):
-            netbox_data["mode"] = map_interface_mode(switchport["mode"])
-
-        # Check for existing interface
-        existing = await self._find_netbox_object(
-            endpoints["interfaces"],
-            device_id=device_id,
-            name=intf_name,
-        )
-
-        if self.dry_run:
-            result.skipped += 1
-            return result
-
-        try:
-            if existing:
-                await self.client.patch(f"{endpoints['interfaces']}{existing['id']}/", netbox_data)
-                result.updated += 1
-                intf_id = existing["id"]
-            else:
-                new_intf = await self.client.post(endpoints["interfaces"], netbox_data)
-                result.created += 1
-                intf_id = new_intf["id"]
-
-            self._track_object("interfaces", intf_id)
-            await self._apply_managed_tag(endpoints["interfaces"], intf_id)
-
-            # Sync IP addresses for this interface
-            await self._sync_interface_ips(interface_data, intf_id, endpoints)
-        except Exception as e:
-            error_msg = f"Failed to sync interface {intf_name}: {e}"
-            result.errors.append(error_msg)
-            LOGGER.warning(error_msg)
-
-        return result
-
-    async def _sync_interface_ips(
-        self,
-        interface_data: dict[str, Any],
-        intf_id: int,
-        endpoints: dict[str, str],
-    ) -> None:
-        """Sync IP addresses for an interface."""
-        # Regular IP addresses
-        for ip_entry in interface_data.get("ip_address_virtual", []):
-            if isinstance(ip_entry, str):
-                await self._sync_ip_address(ip_entry, intf_id, endpoints, role="anycast")
-
-        ip_addr = interface_data.get("ip_address")
-        if ip_addr:
-            await self._sync_ip_address(ip_addr, intf_id, endpoints)
-
-    async def _sync_ip_address(
-        self,
-        ip_address: str,
-        intf_id: int,
-        endpoints: dict[str, str],
-        role: str | None = None,
-    ) -> None:
-        """Sync a single IP address."""
-        ip_data: dict[str, Any] = {
-            "address": ip_address,
-            "assigned_object_type": "dcim.interface",
-            "assigned_object_id": intf_id,
-        }
-        if role:
-            ip_data["role"] = role
-
-        # Find existing IP for this interface
-        existing = None
-        async for ip in self.client.get_all(endpoints["ip_addresses"], params={"address": ip_address}):
-            assigned_obj = ip.get("assigned_object")
-            if assigned_obj and assigned_obj.get("id") == intf_id:
-                existing = ip
-                break
-
-        if self.dry_run:
-            return
-
-        try:
-            if existing:
-                await self.client.patch(f"{endpoints['ip_addresses']}{existing['id']}/", ip_data)
-                ip_id = existing["id"]
-            else:
-                new_ip = await self.client.post(endpoints["ip_addresses"], ip_data)
-                ip_id = new_ip["id"]
-
-            self._track_object("ip_addresses", ip_id)
-            await self._apply_managed_tag(endpoints["ip_addresses"], ip_id)
-        except Exception as e:
-            LOGGER.debug("Failed to sync IP %s: %s", ip_address, e)
+    # =========================================================================
+    # VLAN, VRF, Prefix, ASN, and Cable sync methods
+    # =========================================================================
+    # VLAN, VRF, Prefix, ASN, Cable sync methods (these stay in main class)
+    # =========================================================================
 
     async def sync_vlans(
         self,

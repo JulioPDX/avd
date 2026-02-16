@@ -11,6 +11,12 @@
       dc2: "DC2_JULIO"
     netbox_reconcile: true
     netbox_verify_ssl: false
+    structured_dir: "{{ playbook_dir }}/intended/structured_configs"
+    # Device Type Library - fetch from NetBox community library
+    netbox_devicetype_library_url: "https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista"
+    # Map AVD platform names to library model names (vEOS-lab -> vEOS)
+    netbox_platform_mapping:
+      "vEOS-lab": "vEOS"
     # Async is enabled by default (netbox_use_async: true)
   tasks:
     - name: Sync to NetBox (Async Mode)

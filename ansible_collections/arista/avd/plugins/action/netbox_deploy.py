@@ -59,6 +59,8 @@ ARGUMENT_SPEC = {
     "use_async": {"type": "bool", "default": True},
     "max_concurrent": {"type": "int", "default": 10},
     "purge": {"type": "bool", "default": False},
+    "devicetype_library_url": {"type": "str", "required": False},
+    "platform_mapping": {"type": "dict", "required": False},
 }
 
 
@@ -289,6 +291,8 @@ class ActionModule(ActionBase):
                 create_prerequisites=validated_args.get("create_prerequisites", True),
                 reconcile=validated_args.get("reconcile", False),
                 managed_tag=validated_args.get("managed_tag"),
+                devicetype_library_url=validated_args.get("devicetype_library_url"),
+                platform_mapping=validated_args.get("platform_mapping"),
             )
             return sync.sync_all(configs, node_types)
 
@@ -320,6 +324,8 @@ class ActionModule(ActionBase):
                     reconcile=validated_args.get("reconcile", False),
                     managed_tag=validated_args.get("managed_tag"),
                     max_concurrent=validated_args.get("max_concurrent", 10),
+                    devicetype_library_url=validated_args.get("devicetype_library_url"),
+                    platform_mapping=validated_args.get("platform_mapping"),
                 )
                 return await sync.sync_all(configs, node_types)
 

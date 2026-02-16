@@ -18,6 +18,9 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import httpx
+import yaml
+
 from .models import NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping
 from .transforms import apply_transform, get_nested_value, set_nested_value, slugify
 
@@ -30,7 +33,13 @@ LOGGER = logging.getLogger(__name__)
 
 # Default manufacturer for Arista devices
 DEFAULT_MANUFACTURER = {"name": "Arista", "slug": "arista"}
+# Fallback device type when metadata.platform is not available
 DEFAULT_DEVICE_TYPE = {"model": "vEOS", "slug": "veos"}
+# Default platform (software/OS) for Arista devices
+DEFAULT_PLATFORM = {"name": "EOS", "slug": "eos"}
+
+# Default NetBox Community Device Type Library URL for Arista devices
+DEFAULT_DEVICETYPE_LIBRARY_URL = "https://raw.githubusercontent.com/netbox-community/devicetype-library/master/device-types/Arista"
 
 
 @dataclass
@@ -66,6 +75,8 @@ class AVDNetBoxSync:
         create_prerequisites: If True, create missing sites/roles/types in NetBox
         managed_tag: Tag name to mark AVD-managed objects (default: "avd-managed")
         reconcile: If True, delete objects with managed_tag that weren't synced
+        devicetype_library_url: Base URL for NetBox Community Device Type Library (set to None to disable)
+        platform_mapping: Dict mapping AVD platform names to library device type model names
     """
 
     # Default tag name for AVD-managed objects
@@ -82,6 +93,8 @@ class AVDNetBoxSync:
         create_prerequisites: bool = True,
         managed_tag: str | None = None,
         reconcile: bool = False,
+        devicetype_library_url: str | None = None,
+        platform_mapping: dict[str, str] | None = None,
     ) -> None:
         self.client = client
         self.mapping = mapping or AVDNetBoxMapping()
@@ -91,10 +104,13 @@ class AVDNetBoxSync:
         self.create_prerequisites = create_prerequisites
         self.managed_tag = managed_tag or self.DEFAULT_MANAGED_TAG
         self.reconcile = reconcile
+        self.devicetype_library_url = devicetype_library_url
+        self.platform_mapping = platform_mapping or {}
         self._cache: dict[str, dict[str, Any]] = {}
         self._prerequisites_created = False
         self._site_cache: dict[str, dict[str, Any]] = {}  # Cache for site lookups by name
         self._managed_tag_id: int | None = None  # Cached tag ID
+        self._devicetype_library_cache: dict[str, dict[str, Any] | None] = {}  # Cache for library device types
 
         # Track objects touched during sync for reconciliation
         self._touched_objects: dict[str, set[int]] = {
@@ -117,6 +133,114 @@ class AVDNetBoxSync:
                 if key:
                     self._cache[cache_key][key] = obj
         return self._cache[cache_key]
+
+    def _get_library_model_name(self, platform_name: str) -> str:
+        """
+        Get the device type model name to use for library lookup.
+
+        Uses platform_mapping if a mapping exists, otherwise returns the platform name as-is.
+
+        Args:
+            platform_name: AVD platform name (e.g., "vEOS-lab", "7050SX3", "DCS-7050SX3-48YC12-F")
+
+        Returns:
+            Model name to use for library lookup
+        """
+        return self.platform_mapping.get(platform_name, platform_name)
+
+    def _fetch_devicetype_from_library(self, model_name: str) -> dict[str, Any] | None:
+        """
+        Fetch device type definition from the NetBox Community Device Type Library.
+
+        The library is a community-maintained repository of device type definitions:
+        https://github.com/netbox-community/devicetype-library
+
+        Args:
+            model_name: Device type model name (e.g., "DCS-7050SX3-48YC12-F")
+
+        Returns:
+            Device type definition dict if found, None otherwise
+        """
+        if not self.devicetype_library_url:
+            return None
+
+        # Check cache first
+        if model_name in self._devicetype_library_cache:
+            return self._devicetype_library_cache[model_name]
+
+        # Try different filename variations
+        # The library uses both .yaml and .yml extensions
+        filenames_to_try = [
+            f"{model_name}.yaml",
+            f"{model_name}.yml",
+        ]
+
+        for filename in filenames_to_try:
+            url = f"{self.devicetype_library_url.rstrip('/')}/{filename}"
+            try:
+                LOGGER.debug("Fetching device type from library: %s", url)
+                with httpx.Client(timeout=10.0) as http_client:
+                    response = http_client.get(url)
+                    if response.status_code == 200:
+                        device_type_def = yaml.safe_load(response.text)
+                        self._devicetype_library_cache[model_name] = device_type_def
+                        LOGGER.info("Found device type in library: %s", model_name)
+                        return device_type_def
+            except Exception as e:
+                LOGGER.debug("Failed to fetch device type '%s' from library: %s", model_name, e)
+                continue
+
+        # Not found - cache the miss as None to avoid repeated lookups
+        self._devicetype_library_cache[model_name] = None
+        return None
+
+    def _create_devicetype_from_library(self, library_def: dict[str, Any], manufacturer_id: int) -> dict[str, Any] | None:
+        """
+        Create a device type in NetBox using a definition from the library.
+
+        Creates the device type with physical specs but NOT interface templates,
+        since interfaces are created from AVD structured config.
+
+        Args:
+            library_def: Device type definition from the library
+            manufacturer_id: NetBox manufacturer ID
+
+        Returns:
+            Created device type dict, or None if creation failed
+        """
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Build device type data from library definition
+        device_type_data = {
+            "manufacturer": manufacturer_id,
+            "model": library_def.get("model"),
+            "slug": library_def.get("slug", slugify(library_def.get("model", ""))),
+        }
+
+        # Add optional physical specs
+        if "part_number" in library_def:
+            device_type_data["part_number"] = library_def["part_number"]
+        if "u_height" in library_def:
+            device_type_data["u_height"] = library_def["u_height"]
+        if "is_full_depth" in library_def:
+            device_type_data["is_full_depth"] = library_def["is_full_depth"]
+        if "airflow" in library_def:
+            device_type_data["airflow"] = library_def["airflow"]
+        if "weight" in library_def:
+            device_type_data["weight"] = library_def["weight"]
+            if "weight_unit" in library_def:
+                device_type_data["weight_unit"] = library_def["weight_unit"]
+        if "comments" in library_def:
+            device_type_data["comments"] = library_def["comments"]
+
+        try:
+            device_type = self.client.post(endpoints["device_types"], device_type_data)
+            LOGGER.info("Created device type from library: %s", library_def.get("model"))
+        except Exception as e:
+            LOGGER.warning("Failed to create device type from library: %s", e)
+            return None
+        else:
+            return device_type
 
     def _ensure_managed_tag(self) -> int | None:
         """
@@ -264,6 +388,13 @@ class AVDNetBoxSync:
                         "slug": role_slug,
                     },
                 )
+
+        # Create EOS platform (software/OS) for Arista devices
+        platform = self._find_netbox_object(endpoints["platforms"], slug=DEFAULT_PLATFORM["slug"])
+        if not platform:
+            LOGGER.info("Creating platform: %s", DEFAULT_PLATFORM["name"])
+            platform = self.client.post(endpoints["platforms"], DEFAULT_PLATFORM)
+        self._cache["platform"] = platform
 
         self._prerequisites_created = True
 
@@ -425,18 +556,64 @@ class AVDNetBoxSync:
         # Transform AVD data to NetBox format
         netbox_data = self._transform_avd_to_netbox(avd_structured_config, self.mapping.device_mappings)
 
-        # Handle platform lookup - if we have a nested platform object with slug, look it up
-        if "platform" in netbox_data and isinstance(netbox_data["platform"], dict):
-            platform_slug = netbox_data["platform"].get("slug")
-            # Remove the nested object since NetBox expects an ID
-            del netbox_data["platform"]
-            if platform_slug:
-                # Look up the platform by slug
-                platform = self._find_netbox_object(endpoints["platforms"], slug=platform_slug)
-                if platform:
-                    netbox_data["platform"] = platform["id"]
+        # Handle device_type from metadata.platform (e.g., "vEOS-lab", "7050X3", "720XP")
+        # AVD's metadata.platform maps to NetBox device_type (hardware model)
+        metadata = avd_structured_config.get("metadata", {})
+        platform_name = metadata.get("platform")  # e.g., "vEOS-lab", "7050X3"
+        if platform_name:
+            # Check if there's a platform mapping to a different model name
+            library_model_name = self._get_library_model_name(platform_name)
+            # Use the mapped model name for slug and lookup
+            device_type_slug = slugify(library_model_name)
+            device_type = self._find_netbox_object(endpoints["device_types"], slug=device_type_slug)
+            if device_type:
+                netbox_data["device_type"] = device_type["id"]
+            elif self.create_prerequisites and not self.dry_run:
+                # Get manufacturer for device type creation
+                manufacturer = self._cache.get("manufacturer")
+                if not manufacturer:
+                    manufacturer = self._find_netbox_object(endpoints["manufacturers"], slug=DEFAULT_MANUFACTURER["slug"])
+                manufacturer_id = manufacturer["id"] if manufacturer else None
+
+                # Try to fetch device type definition from library
+                library_def = self._fetch_devicetype_from_library(library_model_name)
+                if library_def and manufacturer_id:
+                    # Create device type with full specs from library
+                    device_type = self._create_devicetype_from_library(library_def, manufacturer_id)
+                    if device_type:
+                        netbox_data["device_type"] = device_type["id"]
+                    else:
+                        # Fallback to simple creation if library creation failed
+                        LOGGER.info("Creating device type (simple): %s", library_model_name)
+                        device_type_data = {"model": library_model_name, "slug": device_type_slug}
+                        if manufacturer_id:
+                            device_type_data["manufacturer"] = manufacturer_id
+                        device_type = self.client.post(endpoints["device_types"], device_type_data)
+                        netbox_data["device_type"] = device_type["id"]
                 else:
-                    LOGGER.debug("Platform '%s' not found in NetBox, skipping platform assignment", platform_slug)
+                    # No library definition found - create simple device type
+                    LOGGER.info("Creating device type: %s", library_model_name)
+                    device_type_data = {"model": library_model_name, "slug": device_type_slug}
+                    if manufacturer_id:
+                        device_type_data["manufacturer"] = manufacturer_id
+                    device_type = self.client.post(endpoints["device_types"], device_type_data)
+                    netbox_data["device_type"] = device_type["id"]
+            else:
+                LOGGER.debug("Device type '%s' not found in NetBox, skipping device_type assignment", platform_name)
+
+        # Set EOS platform (software/OS) for all Arista devices
+        if "platform" in self._cache:
+            netbox_data["platform"] = self._cache["platform"]["id"]
+        else:
+            # Look up or create EOS platform
+            platform = self._find_netbox_object(endpoints["platforms"], slug=DEFAULT_PLATFORM["slug"])
+            if platform:
+                netbox_data["platform"] = platform["id"]
+            elif self.create_prerequisites and not self.dry_run:
+                LOGGER.info("Creating platform: %s", DEFAULT_PLATFORM["name"])
+                platform = self.client.post(endpoints["platforms"], DEFAULT_PLATFORM)
+                self._cache["platform"] = platform
+                netbox_data["platform"] = platform["id"]
 
         # Add device role from node type - need to look up the role ID
         # If node_type not provided, try to infer from hostname
@@ -488,7 +665,8 @@ class AVDNetBoxSync:
                 # Add required fields for new device
                 if site:
                     netbox_data["site"] = site["id"]
-                if "device_type" in self._cache:
+                # Only use default device_type if we haven't already set one from metadata.platform
+                if "device_type" not in netbox_data and "device_type" in self._cache:
                     netbox_data["device_type"] = self._cache["device_type"]["id"]
                 LOGGER.debug("Creating device with data: %s", netbox_data)
                 created = self.client.post(endpoints["devices"], netbox_data)

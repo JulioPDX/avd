@@ -31,10 +31,10 @@ class AVDNetBoxMapping:
     """
 
     # Device mappings (AVD -> NetBox DCIM Device)
+    # Note: metadata.platform is handled separately to map to device_type
     device_mappings: list[FieldMapping] = field(
         default_factory=lambda: [
             FieldMapping("hostname", "name"),
-            FieldMapping("metadata.platform", "platform.slug", transform="slugify"),
             FieldMapping("metadata.serial_number", "serial"),
             FieldMapping("metadata.system_mac_address", "custom_fields.system_mac"),
         ]
