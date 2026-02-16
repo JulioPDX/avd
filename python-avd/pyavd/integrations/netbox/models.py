@@ -10,15 +10,6 @@ Defines the mapping between AVD structured config fields and NetBox API models.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-
-
-class SyncDirection(Enum):
-    """Direction of data synchronization."""
-
-    AVD_TO_NETBOX = "avd_to_netbox"
-    NETBOX_TO_AVD = "netbox_to_avd"
-    BIDIRECTIONAL = "bidirectional"
 
 
 @dataclass
@@ -28,7 +19,6 @@ class FieldMapping:
     avd_path: str  # Dot-notation path in AVD structured config
     netbox_field: str  # NetBox API field name
     transform: str | None = None  # Optional transformation function name
-    sync_direction: SyncDirection = SyncDirection.AVD_TO_NETBOX
 
 
 @dataclass
@@ -99,6 +89,7 @@ class AVDNetBoxMapping:
             "manufacturers": "/api/dcim/manufacturers/",
             "platforms": "/api/dcim/platforms/",
             "cables": "/api/dcim/cables/",
+            "tags": "/api/extras/tags/",
         }
 
 

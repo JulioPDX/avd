@@ -46,3 +46,12 @@ netbox_fail_on_errors: false
 
 # If true, display a summary of sync results at the end.
 netbox_display_results: true
+
+# If true, delete objects from NetBox that are tagged with managed_tag but
+# no longer exist in the AVD structured configs. This is useful for cleaning
+# up orphaned objects when devices/interfaces are removed from AVD.
+netbox_reconcile: false
+
+# Tag name to mark AVD-managed objects in NetBox. Objects with this tag that
+# aren't touched during sync will be deleted if netbox_reconcile is true.
+netbox_managed_tag: "avd-managed"

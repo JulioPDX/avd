@@ -105,13 +105,16 @@ class TestAVDNetBoxSyncDevices:
         result = sync.sync_device(config, node_type="spine")
 
         assert result.created == 1
-        mock_client.post.assert_called_once()
+        # Post is called for device creation and tag creation
+        assert mock_client.post.call_count >= 1
+        # Verify the device was created
+        mock_client.post.assert_any_call("/api/dcim/devices/", {"name": "spine1", "status": "active", "device_type": 1})
 
     def test_sync_existing_device_updates(self, mock_client):
         """Syncing existing device should update it."""
         # Mock finding existing device
-        mock_client.get.return_value = {"results": [{"id": 1, "name": "spine1"}], "count": 1}
-        mock_client.patch.return_value = {"id": 1, "name": "spine1"}
+        mock_client.get.return_value = {"results": [{"id": 1, "name": "spine1", "tags": []}], "count": 1}
+        mock_client.patch.return_value = {"id": 1, "name": "spine1", "tags": []}
 
         sync = AVDNetBoxSync(mock_client, create_prerequisites=False)
         sync._prerequisites_created = True
@@ -120,7 +123,8 @@ class TestAVDNetBoxSyncDevices:
         result = sync.sync_device(config)
 
         assert result.updated == 1
-        mock_client.patch.assert_called_once()
+        # Patch is called for device update and tag application
+        assert mock_client.patch.call_count >= 1
 
 
 class TestParseVlanList:
@@ -224,7 +228,9 @@ class TestSyncPrefix:
         result = sync.sync_prefix("10.0.0.0/24")
 
         assert result.created == 1
-        mock_client.post.assert_called_once()
+        # Post is called for prefix creation and tag creation
+        assert mock_client.post.call_count >= 1
+        mock_client.post.assert_any_call("/api/ipam/prefixes/", {"prefix": "10.0.0.0/24", "status": "active"})
 
     def test_sync_prefix_with_vrf(self, mock_client):
         """Create prefix with VRF assignment."""
@@ -242,14 +248,15 @@ class TestSyncPrefix:
 
     def test_sync_existing_prefix_updates(self, mock_client):
         """Update existing prefix."""
-        mock_client.get.return_value = {"results": [{"id": 1, "prefix": "10.0.0.0/24"}], "count": 1}
-        mock_client.patch.return_value = {"id": 1}
+        mock_client.get.return_value = {"results": [{"id": 1, "prefix": "10.0.0.0/24", "tags": []}], "count": 1}
+        mock_client.patch.return_value = {"id": 1, "tags": []}
 
         sync = AVDNetBoxSync(mock_client)
         result = sync.sync_prefix("10.0.0.0/24")
 
         assert result.updated == 1
-        mock_client.patch.assert_called_once()
+        # Patch is called for prefix update and tag application
+        assert mock_client.patch.call_count >= 1
 
     def test_sync_invalid_prefix(self, mock_client):
         """Invalid prefix format returns error."""
@@ -621,12 +628,17 @@ class TestSyncAsnsFromConfig:
 
     def test_extracts_neighbor_asns(self, mock_client):
         """Extracts remote AS from BGP neighbors."""
+        # Need to handle: RIR creation, ASN creation, tag creation, tag application
+        # For 2 ASNs: RIR (cached after first), ASN1, tag, ASN2
         mock_client.post.side_effect = [
-            {"id": 1, "slug": "private"},
-            {"id": 1, "asn": 65001},
-            {"id": 1, "slug": "private"},
-            {"id": 2, "asn": 65002},
+            {"id": 1, "slug": "private"},  # RIR for ASN 65001
+            {"id": 1, "asn": 65001},  # ASN 65001
+            {"id": 1, "name": "avd-managed", "slug": "avd-managed"},  # Tag creation
+            {"id": 1, "slug": "private"},  # RIR for ASN 65002 (actually cached, but mock needs it)
+            {"id": 2, "asn": 65002},  # ASN 65002
         ]
+        # Also mock get for tag lookup returning nothing (so tag gets created)
+        mock_client.get.return_value = {"results": [], "count": 0}
 
         sync = AVDNetBoxSync(mock_client)
         config = {

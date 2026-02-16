@@ -44,14 +44,14 @@ pyavd/integrations/netbox/
 
 ### Key Components
 
-**NetBoxClient** - Wrapper around pynetbox with support for v1 and v2 API tokens:
+**NetBoxClient** - High-performance HTTP client using httpx with support for v1 and v2 API tokens:
 
 ```python
 from pyavd.integrations.netbox import NetBoxClient
 
 client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
-# Access pynetbox API directly if needed
-client.api.dcim.devices.all()
+# Direct HTTP methods
+devices = client.get("/api/dcim/devices/", params={"site": "dc1"})
 ```
 
 **AVDNetBoxSync** - Main synchronization class:
@@ -77,12 +77,12 @@ FieldMapping(
 
 ## Installation
 
-The integration requires `pynetbox` for NetBox API communication:
+The integration requires `httpx` for NetBox API communication:
 
 ```bash
 pip install 'pyavd[netbox]'
-# Or install pynetbox directly
-pip install pynetbox
+# Or install httpx directly
+pip install httpx
 ```
 
 ## Quick Start
@@ -107,30 +107,34 @@ print(f"Errors: {len(result.errors)}")
 
 ### NetBoxClient
 
-Wrapper around pynetbox providing a consistent interface:
+High-performance HTTP client using httpx with connection pooling:
 
 ```python
 class NetBoxClient:
     def __init__(self, url: str, token: str, *, verify_ssl: bool = True, timeout: float = 30.0)
 
-    @property
-    def api(self) -> pynetbox.api:
-        """Access the underlying pynetbox API instance."""
-
-    # Convenience methods (maintained for backward compatibility)
-    def get(self, endpoint: str, **params) -> dict | None
+    # HTTP methods
+    def get(self, endpoint: str, params: dict = None) -> dict
     def post(self, endpoint: str, data: dict) -> dict
     def patch(self, endpoint: str, data: dict) -> dict
     def delete(self, endpoint: str) -> None
-    def get_all(self, endpoint: str, **params) -> Iterator[dict]  # Paginated
+    def get_all(self, endpoint: str, params: dict = None) -> Iterator[dict]  # Auto-pagination
 ```
 
 ### AVDNetBoxSync
 
 ```python
 class AVDNetBoxSync:
-    def __init__(self, client: NetBoxClient, site_name: str = None,
-                 dry_run: bool = False, create_prerequisites: bool = False)
+    def __init__(
+        self,
+        client: NetBoxClient,
+        site_name: str = None,
+        site_mapping: dict[str, str] = None,  # Map hostname prefix to site name
+        dry_run: bool = False,
+        create_prerequisites: bool = False,
+        managed_tag: str = "avd-managed",     # Tag for reconciliation
+        reconcile: bool = False,              # Delete orphaned objects
+    )
 
     # Main entry point - syncs everything
     def sync_all(self, configs: dict, node_types: dict = None) -> SyncResult
@@ -143,13 +147,16 @@ class AVDNetBoxSync:
     def sync_cables(self, configs: dict) -> SyncResult
     def sync_primary_ip(self, config: dict) -> SyncResult
 
-    # New sync methods
+    # Additional sync methods
     def sync_prefix(self, prefix: str, vrf_name: str = None, description: str = "") -> SyncResult
     def sync_prefixes_from_config(self, config: dict) -> SyncResult
     def sync_asn(self, asn: int | str) -> SyncResult
     def sync_asns_from_config(self, config: dict) -> SyncResult
     def sync_port_channels(self, config: dict) -> SyncResult
     def sync_interface_vlan_associations(self, config: dict) -> SyncResult
+
+    # Reconciliation
+    def reconcile_objects(self, dry_run: bool = None) -> SyncResult
 ```
 
 ### SyncResult
@@ -160,6 +167,7 @@ class SyncResult:
     created: int = 0      # Items created in NetBox
     updated: int = 0      # Items updated in NetBox
     skipped: int = 0      # Items unchanged
+    deleted: int = 0      # Items deleted from NetBox (reconciliation)
     errors: list[str]     # Error messages
 ```
 
@@ -176,6 +184,30 @@ Available transforms for field mappings (in `transforms.py`):
 | `map_vlan_status` | VLAN status mapping | `"suspend"` → `"deprecated"` |
 | `parse_speed` | Parse speed string to int | `"10g"` → `10000000` |
 
+## Reconciliation (Garbage Collection)
+
+The integration supports automatic cleanup of orphaned objects in NetBox. When enabled,
+objects that are tagged with the managed tag (`avd-managed` by default) but no longer
+exist in AVD configs will be deleted.
+
+```python
+from pyavd.integrations.netbox import NetBoxClient, AVDNetBoxSync
+
+client = NetBoxClient("https://netbox.example.com", "nbt_xxx.yyy")
+sync = AVDNetBoxSync(
+    client,
+    site_name="DC1",
+    reconcile=True,           # Enable reconciliation
+    managed_tag="avd-managed" # Tag for managed objects (default)
+)
+
+# All synced objects get tagged automatically
+result = sync.sync_all(configs, node_types)
+
+# Objects with the tag that weren't touched are deleted at the end
+# Deletion order: cables → IPs → interfaces → prefixes → VLANs → VRFs → ASNs → devices
+```
+
 ## Testing
 
 Run the unit test suite:
@@ -187,11 +219,11 @@ pytest tests/pyavd/integrations/netbox/ -v
 
 **Test coverage includes:**
 
-- Client wrapper around pynetbox
+- HTTP client with httpx
 - API operations (GET, POST, PATCH, DELETE)
 - Pagination handling
 - All transform functions
-- Sync operations for all data types (123 tests total)
+- Sync operations for all data types (120+ tests total)
 
 ## Development
 

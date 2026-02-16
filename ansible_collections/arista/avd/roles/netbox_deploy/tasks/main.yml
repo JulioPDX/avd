@@ -31,6 +31,8 @@
     dry_run: "{{ netbox_dry_run }}"
     return_details: "{{ netbox_return_details }}"
     fail_on_errors: "{{ netbox_fail_on_errors }}"
+    reconcile: "{{ netbox_reconcile }}"
+    managed_tag: "{{ netbox_managed_tag }}"
   register: netbox_deploy_results
 
 - name: Display NetBox sync results
@@ -43,6 +45,7 @@
         Created: {{ netbox_deploy_results.created | default(0) }}
         Updated: {{ netbox_deploy_results.updated | default(0) }}
         Skipped: {{ netbox_deploy_results.skipped | default(0) }}
+        Deleted: {{ netbox_deploy_results.deleted | default(0) }}
         Errors:  {{ netbox_deploy_results.errors | default([]) | length }}
       {% if netbox_deploy_results.errors | default([]) %}
 

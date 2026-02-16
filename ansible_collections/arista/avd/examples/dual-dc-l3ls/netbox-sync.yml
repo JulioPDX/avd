@@ -27,6 +27,8 @@
       dc1: "DC1_JULIO"
       dc2: "DC2_JULIO"
     netbox_return_details: true
+    # Enable reconciliation to delete orphaned objects
+    netbox_reconcile: true
 
     # Path to structured configs (auto-detected from playbook location)
     root_dir: "{{ playbook_dir }}"

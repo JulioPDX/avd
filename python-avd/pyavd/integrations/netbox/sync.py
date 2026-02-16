@@ -40,6 +40,7 @@ class SyncResult:
     created: int = 0
     updated: int = 0
     skipped: int = 0
+    deleted: int = 0
     errors: list[str] = field(default_factory=list)
 
     def __add__(self, other: SyncResult) -> SyncResult:
@@ -47,6 +48,7 @@ class SyncResult:
             created=self.created + other.created,
             updated=self.updated + other.updated,
             skipped=self.skipped + other.skipped,
+            deleted=self.deleted + other.deleted,
             errors=self.errors + other.errors,
         )
 
@@ -62,7 +64,12 @@ class AVDNetBoxSync:
         site_name: Default NetBox site name for new objects
         site_mapping: Dict mapping hostname prefix to site name (e.g., {"dc1": "DC1_Site", "dc2": "DC2_Site"})
         create_prerequisites: If True, create missing sites/roles/types in NetBox
+        managed_tag: Tag name to mark AVD-managed objects (default: "avd-managed")
+        reconcile: If True, delete objects with managed_tag that weren't synced
     """
+
+    # Default tag name for AVD-managed objects
+    DEFAULT_MANAGED_TAG = "avd-managed"
 
     def __init__(
         self,
@@ -73,6 +80,8 @@ class AVDNetBoxSync:
         site_name: str | None = None,
         site_mapping: dict[str, str] | None = None,
         create_prerequisites: bool = True,
+        managed_tag: str | None = None,
+        reconcile: bool = False,
     ) -> None:
         self.client = client
         self.mapping = mapping or AVDNetBoxMapping()
@@ -80,9 +89,24 @@ class AVDNetBoxSync:
         self.site_name = site_name
         self.site_mapping = site_mapping or {}
         self.create_prerequisites = create_prerequisites
+        self.managed_tag = managed_tag or self.DEFAULT_MANAGED_TAG
+        self.reconcile = reconcile
         self._cache: dict[str, dict[str, Any]] = {}
         self._prerequisites_created = False
         self._site_cache: dict[str, dict[str, Any]] = {}  # Cache for site lookups by name
+        self._managed_tag_id: int | None = None  # Cached tag ID
+
+        # Track objects touched during sync for reconciliation
+        self._touched_objects: dict[str, set[int]] = {
+            "devices": set(),
+            "interfaces": set(),
+            "vlans": set(),
+            "vrfs": set(),
+            "ip_addresses": set(),
+            "prefixes": set(),
+            "cables": set(),
+            "asns": set(),
+        }
 
     def _get_or_cache(self, cache_key: str, endpoint: str, lookup_field: str) -> dict[str, Any]:
         """Get cached lookup table or fetch from NetBox."""
@@ -93,6 +117,103 @@ class AVDNetBoxSync:
                 if key:
                     self._cache[cache_key][key] = obj
         return self._cache[cache_key]
+
+    def _ensure_managed_tag(self) -> int | None:
+        """
+        Ensure the managed tag exists in NetBox.
+
+        Returns:
+            Tag ID if successful, None if dry_run or failed
+        """
+        if self._managed_tag_id is not None:
+            return self._managed_tag_id
+
+        if self.dry_run:
+            return None
+
+        endpoints = self.mapping.get_netbox_endpoints()
+        tag_slug = slugify(self.managed_tag)
+
+        # Check if tag already exists
+        existing = self._find_netbox_object(endpoints["tags"], slug=tag_slug)
+        if existing:
+            self._managed_tag_id = existing["id"]
+            return self._managed_tag_id
+
+        # Create the tag
+        try:
+            tag_data = {
+                "name": self.managed_tag,
+                "slug": tag_slug,
+                "color": "0077ff",  # Blue color for visibility
+                "description": "Objects managed by AVD NetBox sync - do not modify manually",
+            }
+            tag = self.client.post(endpoints["tags"], tag_data)
+            self._managed_tag_id = tag["id"]
+            LOGGER.info("Created managed tag: %s", self.managed_tag)
+        except Exception as e:
+            LOGGER.warning("Failed to create managed tag: %s", e)
+            return None
+        else:
+            return self._managed_tag_id
+
+    def _apply_managed_tag(self, endpoint: str, obj_id: int) -> bool:
+        """
+        Apply the managed tag to an object.
+
+        Args:
+            endpoint: NetBox API endpoint (e.g., "/api/dcim/devices/")
+            obj_id: Object ID
+
+        Returns:
+            True if tag was applied successfully
+        """
+        if self.dry_run:
+            return False
+
+        tag_id = self._ensure_managed_tag()
+        if not tag_id:
+            return False
+
+        try:
+            # Get current tags on the object
+            obj = self.client.get(f"{endpoint}{obj_id}/")
+            current_tags = obj.get("tags", [])
+
+            # Check if tag already applied
+            current_tag_ids = [t["id"] if isinstance(t, dict) else t for t in current_tags]
+            if tag_id in current_tag_ids:
+                return True
+
+            # Add our tag to existing tags
+            new_tags = [*current_tag_ids, tag_id]
+            self.client.patch(f"{endpoint}{obj_id}/", {"tags": new_tags})
+        except Exception as e:
+            LOGGER.debug("Failed to apply managed tag to %s%s: %s", endpoint, obj_id, e)
+            return False
+        else:
+            return True
+
+    def _track_object(self, obj_type: str, obj_id: int, endpoint: str | None = None) -> None:
+        """
+        Track an object as touched during this sync and apply managed tag.
+
+        Args:
+            obj_type: Object type key (e.g., "devices", "interfaces")
+            obj_id: Object ID
+            endpoint: Optional endpoint for applying tag (if provided, tag will be applied)
+        """
+        if obj_type in self._touched_objects and obj_id is not None:
+            self._touched_objects[obj_type].add(obj_id)
+
+            # Apply managed tag if endpoint provided
+            if endpoint:
+                self._apply_managed_tag(endpoint, obj_id)
+
+    def reset_tracking(self) -> None:
+        """Reset the touched objects tracking for a new sync run."""
+        for obj_type in self._touched_objects:
+            self._touched_objects[obj_type] = set()
 
     def _ensure_prerequisites(self) -> None:
         """Ensure required NetBox objects exist (site, manufacturer, device type, roles)."""
@@ -353,6 +474,7 @@ class AVDNetBoxSync:
         try:
             # Get site for this hostname (using site_mapping or default site_name)
             site = self._get_site_for_hostname(hostname)
+            device_id = None
 
             if existing:
                 # Update existing device - also update site if site_mapping is used
@@ -360,6 +482,7 @@ class AVDNetBoxSync:
                     netbox_data["site"] = site["id"]
                 self.client.patch(f"{endpoints['devices']}{existing['id']}/", netbox_data)
                 result.updated += 1
+                device_id = existing["id"]
                 LOGGER.debug("Updated device: %s", hostname)
             else:
                 # Add required fields for new device
@@ -368,9 +491,15 @@ class AVDNetBoxSync:
                 if "device_type" in self._cache:
                     netbox_data["device_type"] = self._cache["device_type"]["id"]
                 LOGGER.debug("Creating device with data: %s", netbox_data)
-                self.client.post(endpoints["devices"], netbox_data)
+                created = self.client.post(endpoints["devices"], netbox_data)
                 result.created += 1
+                device_id = created.get("id")
                 LOGGER.debug("Created device: %s", hostname)
+
+            # Track the device and apply managed tag
+            if device_id:
+                self._track_object("devices", device_id, endpoints["devices"])
+
         except Exception as e:
             error_msg = f"Failed to sync device {hostname}: {e}"
             result.errors.append(error_msg)
@@ -454,13 +583,20 @@ class AVDNetBoxSync:
 
         try:
             created_intf = None
+            intf_id = None
             if existing:
                 self.client.patch(f"{endpoints['interfaces']}{existing['id']}/", netbox_data)
                 result.updated += 1
                 created_intf = existing
+                intf_id = existing["id"]
             else:
                 created_intf = self.client.post(endpoints["interfaces"], netbox_data)
                 result.created += 1
+                intf_id = created_intf.get("id")
+
+            # Track the interface and apply managed tag
+            if intf_id:
+                self._track_object("interfaces", intf_id, endpoints["interfaces"])
 
             # Use the interface with ID for IP assignment
             intf_for_ip = created_intf or existing
@@ -538,13 +674,23 @@ class AVDNetBoxSync:
         existing_ip = self._find_ip_for_interface(endpoints["ip_addresses"], ip_address, intf_id)
 
         try:
+            ip_id = None
             if existing_ip:
                 self.client.patch(f"{endpoints['ip_addresses']}{existing_ip['id']}/", ip_data)
-                return existing_ip
-            return self.client.post(endpoints["ip_addresses"], ip_data)
+                ip_id = existing_ip["id"]
+                result_ip = existing_ip
+            else:
+                result_ip = self.client.post(endpoints["ip_addresses"], ip_data)
+                ip_id = result_ip.get("id")
+
+            # Track the IP and apply managed tag
+            if ip_id:
+                self._track_object("ip_addresses", ip_id, endpoints["ip_addresses"])
         except Exception as e:
             LOGGER.warning("Failed to sync IP %s: %s", ip_address, e)
             return None
+        else:
+            return result_ip
 
     def _find_ip_for_interface(self, ip_endpoint: str, address: str, interface_id: int) -> dict[str, Any] | None:
         """
@@ -599,12 +745,20 @@ class AVDNetBoxSync:
                 continue
 
             try:
+                nb_vlan_id = None
                 if existing:
                     self.client.patch(f"{endpoints['vlans']}{existing['id']}/", netbox_data)
                     result.updated += 1
+                    nb_vlan_id = existing["id"]
                 else:
-                    self.client.post(endpoints["vlans"], netbox_data)
+                    created = self.client.post(endpoints["vlans"], netbox_data)
                     result.created += 1
+                    nb_vlan_id = created.get("id")
+
+                # Track the VLAN and apply managed tag
+                if nb_vlan_id:
+                    self._track_object("vlans", nb_vlan_id, endpoints["vlans"])
+
             except Exception as e:
                 result.errors.append(f"Failed to sync VLAN {vlan_id}: {e}")
 
@@ -632,12 +786,20 @@ class AVDNetBoxSync:
                 continue
 
             try:
+                vrf_id = None
                 if existing:
                     self.client.patch(f"{endpoints['vrfs']}{existing['id']}/", netbox_data)
                     result.updated += 1
+                    vrf_id = existing["id"]
                 else:
-                    self.client.post(endpoints["vrfs"], netbox_data)
+                    created = self.client.post(endpoints["vrfs"], netbox_data)
                     result.created += 1
+                    vrf_id = created.get("id")
+
+                # Track the VRF and apply managed tag
+                if vrf_id:
+                    self._track_object("vrfs", vrf_id, endpoints["vrfs"])
+
             except Exception as e:
                 result.errors.append(f"Failed to sync VRF {vrf_name}: {e}")
 
@@ -754,12 +916,20 @@ class AVDNetBoxSync:
             prefix_data["description"] = description
 
         try:
+            prefix_id = None
             if existing:
                 self.client.patch(f"{endpoints['prefixes']}{existing['id']}/", prefix_data)
                 result.updated += 1
+                prefix_id = existing["id"]
             else:
-                self.client.post(endpoints["prefixes"], prefix_data)
+                created = self.client.post(endpoints["prefixes"], prefix_data)
                 result.created += 1
+                prefix_id = created.get("id")
+
+            # Track the prefix and apply managed tag
+            if prefix_id:
+                self._track_object("prefixes", prefix_id, endpoints["prefixes"])
+
         except Exception as e:
             result.errors.append(f"Failed to sync prefix {prefix}: {e}")
 
@@ -899,12 +1069,20 @@ class AVDNetBoxSync:
         }
 
         try:
+            asn_id = None
             if existing:
                 self.client.patch(f"{endpoints['asns']}{existing['id']}/", asn_data)
                 result.updated += 1
+                asn_id = existing["id"]
             else:
-                self.client.post(endpoints["asns"], asn_data)
+                created = self.client.post(endpoints["asns"], asn_data)
                 result.created += 1
+                asn_id = created.get("id")
+
+            # Track the ASN and apply managed tag
+            if asn_id:
+                self._track_object("asns", asn_id, endpoints["asns"])
+
             LOGGER.debug("Synced ASN %s", asn_int)
         except Exception as e:
             result.errors.append(f"Failed to sync ASN {asn_int}: {e}")
@@ -1273,6 +1451,77 @@ class AVDNetBoxSync:
                     continue
         return vlan_ids
 
+    def reconcile_objects(self, dry_run: bool | None = None) -> SyncResult:
+        """
+        Delete objects with managed tag that weren't touched in this sync.
+
+        This removes orphaned objects from NetBox that no longer exist in AVD configs.
+        Objects are deleted in reverse dependency order to avoid foreign key errors.
+
+        Args:
+            dry_run: Override instance dry_run setting for this operation
+
+        Returns:
+            SyncResult with deletion counts in the 'deleted' field
+        """
+        result = SyncResult()
+        use_dry_run = dry_run if dry_run is not None else self.dry_run
+
+        if not self.reconcile:
+            return result
+
+        tag_id = self._ensure_managed_tag()
+        if not tag_id:
+            LOGGER.warning("Cannot reconcile: managed tag not found")
+            return result
+
+        endpoints = self.mapping.get_netbox_endpoints()
+
+        # Deletion order (reverse dependencies): cables → IPs → interfaces → prefixes → VLANs → VRFs → ASNs → devices
+        deletion_order = [
+            ("cables", endpoints["cables"]),
+            ("ip_addresses", endpoints["ip_addresses"]),
+            ("interfaces", endpoints["interfaces"]),
+            ("prefixes", endpoints["prefixes"]),
+            ("vlans", endpoints["vlans"]),
+            ("vrfs", endpoints["vrfs"]),
+            ("asns", endpoints["asns"]),
+            ("devices", endpoints["devices"]),
+        ]
+
+        for object_type, endpoint in deletion_order:
+            touched_ids = self._touched_objects.get(object_type, set())
+
+            # Get all objects with managed tag
+            params = {"tag": self.managed_tag}
+
+            # Find objects to delete
+            to_delete = []
+            for obj in self.client.get_all(endpoint, params=params):
+                obj_id = obj.get("id")
+                if obj_id and obj_id not in touched_ids:
+                    to_delete.append(obj)
+
+            # Delete orphaned objects
+            for obj in to_delete:
+                obj_id = obj["id"]
+                obj_name = obj.get("name") or obj.get("display") or obj.get("address") or obj.get("prefix") or str(obj_id)
+
+                if use_dry_run:
+                    LOGGER.info("[DRY RUN] Would delete %s: %s (ID: %s)", object_type, obj_name, obj_id)
+                    result.skipped += 1
+                else:
+                    try:
+                        self.client.delete(f"{endpoint}{obj_id}/")
+                        result.deleted += 1
+                        LOGGER.info("Deleted orphaned %s: %s", object_type, obj_name)
+                    except Exception as e:
+                        error_msg = f"Failed to delete {object_type} {obj_name}: {e}"
+                        result.errors.append(error_msg)
+                        LOGGER.warning(error_msg)
+
+        return result
+
     def sync_all(
         self,
         avd_structured_configs: dict[str, dict[str, Any]],
@@ -1327,11 +1576,24 @@ class AVDNetBoxSync:
         # Sync cables after all devices and interfaces exist
         result = result + self.sync_cables(avd_structured_configs)
 
+        # Reconcile objects if enabled (delete orphaned objects)
+        if self.reconcile:
+            LOGGER.info("Reconciling NetBox objects (deleting orphaned objects)...")
+            reconcile_result = self.reconcile_objects()
+            LOGGER.info(
+                "Reconciliation complete: %d deleted, %d skipped, %d errors",
+                reconcile_result.deleted,
+                reconcile_result.skipped,
+                len(reconcile_result.errors),
+            )
+            result = result + reconcile_result
+
         LOGGER.info(
-            "Sync complete: %d created, %d updated, %d skipped, %d errors",
+            "Sync complete: %d created, %d updated, %d skipped, %d deleted, %d errors",
             result.created,
             result.updated,
             result.skipped,
+            result.deleted,
             len(result.errors),
         )
 
@@ -1419,6 +1681,10 @@ class AVDNetBoxSync:
         )
 
         if existing_cable:
+            # Track existing cable for reconciliation
+            cable_id = existing_cable.get("id")
+            if cable_id:
+                self._track_object("cables", cable_id, endpoints["cables"])
             result.skipped += 1
             return result
 
@@ -1439,8 +1705,14 @@ class AVDNetBoxSync:
                 "b_terminations": [{"object_type": "dcim.interface", "object_id": intf_b["id"]}],
                 "status": "connected",
             }
-            self.client.post(endpoints["cables"], cable_data)
+            created = self.client.post(endpoints["cables"], cable_data)
             result.created += 1
+
+            # Track the cable and apply managed tag
+            cable_id = created.get("id")
+            if cable_id:
+                self._track_object("cables", cable_id, endpoints["cables"])
+
             LOGGER.debug(
                 "Created cable: %s:%s <-> %s:%s",
                 device_a,

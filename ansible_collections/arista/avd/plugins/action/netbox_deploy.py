@@ -53,6 +53,8 @@ ARGUMENT_SPEC = {
     "dry_run": {"type": "bool", "default": False},
     "return_details": {"type": "bool", "default": False},
     "fail_on_errors": {"type": "bool", "default": False},
+    "reconcile": {"type": "bool", "default": False},
+    "managed_tag": {"type": "str", "default": "avd-managed"},
 }
 
 
@@ -150,15 +152,18 @@ class ActionModule(ActionBase):
                     site_mapping=site_mapping,
                     dry_run=dry_run,
                     create_prerequisites=validated_args.get("create_prerequisites", True),
+                    reconcile=validated_args.get("reconcile", False),
+                    managed_tag=validated_args.get("managed_tag"),
                 )
 
                 sync_result = sync.sync_all(configs, node_types)
 
             # Populate result
-            result["changed"] = sync_result.created > 0 or sync_result.updated > 0
+            result["changed"] = sync_result.created > 0 or sync_result.updated > 0 or sync_result.deleted > 0
             result["created"] = sync_result.created
             result["updated"] = sync_result.updated
             result["skipped"] = sync_result.skipped
+            result["deleted"] = sync_result.deleted
             result["errors"] = sync_result.errors
 
             # Only fail if fail_on_errors is True (default: False)
@@ -173,7 +178,10 @@ class ActionModule(ActionBase):
             if sync_result.errors:
                 result["msg"] = f"Sync completed with {len(sync_result.errors)} error(s)"
             else:
-                result["msg"] = f"Sync completed: {sync_result.created} created, {sync_result.updated} updated, {sync_result.skipped} skipped"
+                msg_parts = [f"{sync_result.created} created", f"{sync_result.updated} updated", f"{sync_result.skipped} skipped"]
+                if sync_result.deleted > 0:
+                    msg_parts.append(f"{sync_result.deleted} deleted")
+                result["msg"] = f"Sync completed: {', '.join(msg_parts)}"
 
         except Exception as e:
             LOGGER.exception("NetBox sync failed")

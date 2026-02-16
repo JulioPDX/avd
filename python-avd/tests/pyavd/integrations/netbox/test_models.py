@@ -12,17 +12,7 @@ from pyavd.integrations.netbox.models import (
     VLAN_STATUS_MAP,
     AVDNetBoxMapping,
     FieldMapping,
-    SyncDirection,
 )
-
-
-class TestSyncDirection:
-    """Tests for SyncDirection enum."""
-
-    def test_values(self):
-        assert SyncDirection.AVD_TO_NETBOX.value == "avd_to_netbox"
-        assert SyncDirection.NETBOX_TO_AVD.value == "netbox_to_avd"
-        assert SyncDirection.BIDIRECTIONAL.value == "bidirectional"
 
 
 class TestFieldMapping:
@@ -33,15 +23,10 @@ class TestFieldMapping:
         assert mapping.avd_path == "hostname"
         assert mapping.netbox_field == "name"
         assert mapping.transform is None
-        assert mapping.sync_direction == SyncDirection.AVD_TO_NETBOX
 
     def test_mapping_with_transform(self):
         mapping = FieldMapping("metadata.platform", "platform.slug", transform="slugify")
         assert mapping.transform == "slugify"
-
-    def test_mapping_with_direction(self):
-        mapping = FieldMapping("site_name", "site.name", sync_direction=SyncDirection.NETBOX_TO_AVD)
-        assert mapping.sync_direction == SyncDirection.NETBOX_TO_AVD
 
 
 class TestAVDNetBoxMapping:

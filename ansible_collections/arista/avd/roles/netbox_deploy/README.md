@@ -25,12 +25,12 @@ The role synchronizes the following objects from AVD to NetBox:
 
 ## Requirements
 
-This role requires the `pynetbox` Python library:
+This role requires the `httpx` Python library:
 
 ```bash
 pip install 'pyavd[netbox]'
-# Or install pynetbox directly
-pip install pynetbox
+# Or install httpx directly
+pip install httpx
 ```
 
 ## Example
@@ -77,6 +77,8 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_return_details` | `false` | Return detailed sync information |
 | `netbox_fail_on_errors` | `false` | Fail playbook when there are sync errors |
 | `netbox_display_results` | `true` | Display sync results summary at end of role |
+| `netbox_reconcile` | `false` | Delete orphaned objects from NetBox |
+| `netbox_managed_tag` | `avd-managed` | Tag name for AVD-managed objects |
 
 ### Directory Configuration
 
@@ -215,6 +217,56 @@ For multi-site deployments where devices from different sites are in the same st
 
 Devices with hostnames starting with `dc1` (e.g., `dc1-spine1`, `dc1-leaf1a`) will be assigned to "DC1_Site",
 while devices starting with `dc2` will be assigned to "DC2_Site".
+
+## Reconciliation (Garbage Collection)
+
+When `netbox_reconcile: true`, the role will delete objects from NetBox that are tagged with
+`netbox_managed_tag` (default: `avd-managed`) but no longer exist in the AVD structured configs.
+
+This is useful for cleaning up orphaned objects when devices, interfaces, VLANs, or other
+objects are removed from your AVD configurations.
+
+### How It Works
+
+1. All objects synced to NetBox are automatically tagged with the managed tag (`avd-managed`)
+2. During sync, the role tracks which objects were touched
+3. At the end of sync (if `netbox_reconcile: true`), objects with the managed tag that weren't
+   touched are deleted
+
+### Deletion Order
+
+Objects are deleted in reverse dependency order to avoid foreign key errors:
+
+1. Cables
+2. IP Addresses
+3. Interfaces
+4. Prefixes
+5. VLANs
+6. VRFs
+7. ASNs
+8. Devices
+
+### Example with Reconciliation
+
+```yaml
+- name: Sync to NetBox with cleanup
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_site_name: "DC1"
+    netbox_reconcile: true  # Delete orphaned objects
+    # netbox_managed_tag: "custom-tag"  # Optional: use a custom tag name
+  tasks:
+    - name: Deploy to NetBox
+      ansible.builtin.import_role:
+        name: arista.avd.netbox_deploy
+```
+
+> **Warning**: Use `netbox_dry_run: true` first to preview what would be deleted before
+> enabling reconciliation in production.
 
 ## License
 

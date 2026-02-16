@@ -20,7 +20,7 @@ Example usage:
 """
 
 from .client import NetBoxAPIError, NetBoxAuthError, NetBoxClient, NetBoxClientError
-from .models import AVDNetBoxMapping, FieldMapping, SyncDirection
+from .models import AVDNetBoxMapping, FieldMapping
 from .sync import AVDNetBoxSync, SyncResult
 
 __all__ = [
@@ -31,6 +31,5 @@ __all__ = [
     "NetBoxAuthError",
     "NetBoxClient",
     "NetBoxClientError",
-    "SyncDirection",
     "SyncResult",
 ]
