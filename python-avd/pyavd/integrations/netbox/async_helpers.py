@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import yaml
 
-from .models import NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping
-from .sync import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER
+from .models import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping
 
 if TYPE_CHECKING:
     import asyncio

@@ -79,8 +79,7 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_display_results` | `true` | Display sync results summary at end of role |
 | `netbox_reconcile` | `false` | Delete orphaned objects from NetBox |
 | `netbox_managed_tag` | `avd-managed` | Tag name for AVD-managed objects |
-| `netbox_use_async` | `true` | Use async HTTP client for better performance (4-8x faster) |
-| `netbox_max_concurrent` | `10` | Maximum concurrent API requests when using async mode |
+| `netbox_max_concurrent` | `10` | Maximum concurrent API requests |
 | `netbox_purge` | `false` | Delete ALL objects with managed tag (destructive) |
 | `netbox_devicetype_library_url` | - | URL for NetBox Community Device Type Library (disabled by default) |
 | `netbox_platform_mapping` | - | Dict mapping AVD platform names to library device type model names |
@@ -349,14 +348,8 @@ library fetch, omit `netbox_devicetype_library_url` or don't define it.
 
 ## Performance
 
-The role uses async HTTP requests by default for significantly better performance. With async mode enabled
-(`netbox_use_async: true`, the default), multiple devices are synced concurrently, resulting in 4-8x faster
-sync times compared to sequential processing.
-
-| Mode | 16 Devices | 32 Devices |
-| ---- | ---------- | ---------- |
-| Sync (sequential) | ~16 seconds | ~32 seconds |
-| Async (concurrent) | ~3-4 seconds | ~6-8 seconds |
+The role uses async HTTP requests with concurrent device processing for high performance.
+Multiple devices are synced concurrently, resulting in significantly faster sync times.
 
 ### Tuning Concurrency
 
@@ -374,12 +367,6 @@ The `netbox_max_concurrent` parameter controls how many API requests can be made
     netbox_token: "{{ vault_netbox_token }}"
     netbox_site_name: "DC1"
     netbox_max_concurrent: 20  # Increase for faster sync
-```
-
-To disable async mode (use sequential processing):
-
-```yaml
-netbox_use_async: false
 ```
 
 ## License

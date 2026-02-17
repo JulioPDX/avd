@@ -8,8 +8,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .models import NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping
-from .sync import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, DEFAULT_PLATFORM, SyncResult
+from .models import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, DEFAULT_PLATFORM, NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping, SyncResult
 from .transforms import slugify
 
 if TYPE_CHECKING:

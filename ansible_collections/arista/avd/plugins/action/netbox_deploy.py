@@ -16,13 +16,13 @@ from yaml import load
 from ansible_collections.arista.avd.plugins.plugin_utils.utils import YamlLoader
 
 if TYPE_CHECKING:
-    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient, AVDNetBoxSync, NetBoxClient
+    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient
 
 PLUGIN_NAME = "arista.avd.netbox_deploy"
 
 try:
     from pyavd._utils import strip_empties_from_dict
-    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient, AVDNetBoxSync, NetBoxClient
+    from pyavd.integrations.netbox import AsyncAVDNetBoxSync, AsyncNetBoxClient
 
     HAS_PYAVD = True
 except ImportError:
@@ -56,7 +56,6 @@ ARGUMENT_SPEC = {
     "fail_on_errors": {"type": "bool", "default": False},
     "reconcile": {"type": "bool", "default": False},
     "managed_tag": {"type": "str", "default": "avd-managed"},
-    "use_async": {"type": "bool", "default": True},
     "max_concurrent": {"type": "int", "default": 10},
     "purge": {"type": "bool", "default": False},
     "devicetype_library_url": {"type": "str", "required": False},
@@ -155,13 +154,9 @@ class ActionModule(ActionBase):
 
             # Check for dry_run / check_mode
             dry_run = validated_args.get("dry_run", False) or self._play_context.check_mode
-            use_async = validated_args.get("use_async", True)
 
             # Connect to NetBox and sync
-            if use_async:
-                sync_result = self._run_async_sync(validated_args, configs, node_types, site_name, site_mapping, dry_run)
-            else:
-                sync_result = self._run_sync(validated_args, configs, node_types, site_name, site_mapping, dry_run)
+            sync_result = self._run_async_sync(validated_args, configs, node_types, site_name, site_mapping, dry_run)
 
             # Populate result
             result["changed"] = sync_result.created > 0 or sync_result.updated > 0 or sync_result.deleted > 0
@@ -198,10 +193,9 @@ class ActionModule(ActionBase):
     def _run_purge(self, validated_args: dict, result: dict) -> dict:
         """Delete all AVD-managed objects from NetBox."""
         dry_run = validated_args.get("dry_run", False) or self._play_context.check_mode
-        use_async = validated_args.get("use_async", True)
 
         try:
-            purge_result = self._run_async_purge(validated_args, dry_run) if use_async else self._run_sync_purge(validated_args, dry_run)
+            purge_result = self._run_async_purge(validated_args, dry_run)
 
             result["changed"] = purge_result.deleted > 0
             result["created"] = 0
@@ -231,21 +225,6 @@ class ActionModule(ActionBase):
 
         return result
 
-    def _run_sync_purge(self, validated_args: dict, dry_run: bool) -> Any:
-        """Run synchronous purge."""
-        with NetBoxClient(
-            url=validated_args["netbox_url"],
-            token=validated_args["netbox_token"],
-            verify_ssl=validated_args.get("verify_ssl", True),
-            timeout=validated_args.get("timeout", 30.0),
-        ) as client:
-            sync = AVDNetBoxSync(
-                client=client,
-                dry_run=dry_run,
-                managed_tag=validated_args.get("managed_tag"),
-            )
-            return sync.purge_all()
-
     def _run_async_purge(self, validated_args: dict, dry_run: bool) -> Any:
         """Run async purge using asyncio.run()."""
 
@@ -266,35 +245,6 @@ class ActionModule(ActionBase):
                 return await sync.purge_all()
 
         return asyncio.run(_async_purge())
-
-    def _run_sync(
-        self,
-        validated_args: dict,
-        configs: dict,
-        node_types: dict,
-        site_name: str | None,
-        site_mapping: dict | None,
-        dry_run: bool,
-    ) -> Any:
-        """Run synchronous sync."""
-        with NetBoxClient(
-            url=validated_args["netbox_url"],
-            token=validated_args["netbox_token"],
-            verify_ssl=validated_args.get("verify_ssl", True),
-            timeout=validated_args.get("timeout", 30.0),
-        ) as client:
-            sync = AVDNetBoxSync(
-                client=client,
-                site_name=site_name,
-                site_mapping=site_mapping,
-                dry_run=dry_run,
-                create_prerequisites=validated_args.get("create_prerequisites", True),
-                reconcile=validated_args.get("reconcile", False),
-                managed_tag=validated_args.get("managed_tag"),
-                devicetype_library_url=validated_args.get("devicetype_library_url"),
-                platform_mapping=validated_args.get("platform_mapping"),
-            )
-            return sync.sync_all(configs, node_types)
 
     def _run_async_sync(
         self,

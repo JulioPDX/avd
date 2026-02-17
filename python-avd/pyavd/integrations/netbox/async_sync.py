@@ -19,8 +19,7 @@ from typing import TYPE_CHECKING, Any
 from .async_device import AsyncDeviceMixin
 from .async_helpers import AsyncHelpersMixin
 from .async_interface import AsyncInterfaceMixin
-from .models import AVDNetBoxMapping
-from .sync import SyncResult
+from .models import AVDNetBoxMapping, SyncResult
 
 if TYPE_CHECKING:
     from .client import AsyncNetBoxClient

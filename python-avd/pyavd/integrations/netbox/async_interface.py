@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .sync import SyncResult
+from .models import SyncResult
 from .transforms import map_interface_mode, map_interface_type
 
 if TYPE_CHECKING:

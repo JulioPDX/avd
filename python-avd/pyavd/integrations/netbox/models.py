@@ -124,3 +124,29 @@ VLAN_STATUS_MAP: dict[str, str] = {
     "active": "active",
     "suspend": "deprecated",
 }
+
+
+# Default values for NetBox objects
+DEFAULT_MANUFACTURER: dict[str, str] = {"name": "Arista", "slug": "arista"}
+DEFAULT_DEVICE_TYPE: dict[str, str] = {"model": "vEOS", "slug": "veos"}
+DEFAULT_PLATFORM: dict[str, str] = {"name": "EOS", "slug": "eos"}
+
+
+@dataclass
+class SyncResult:
+    """Result of a sync operation."""
+
+    created: int = 0
+    updated: int = 0
+    skipped: int = 0
+    deleted: int = 0
+    errors: list[str] = field(default_factory=list)
+
+    def __add__(self, other: SyncResult) -> SyncResult:
+        return SyncResult(
+            created=self.created + other.created,
+            updated=self.updated + other.updated,
+            skipped=self.skipped + other.skipped,
+            deleted=self.deleted + other.deleted,
+            errors=self.errors + other.errors,
+        )
