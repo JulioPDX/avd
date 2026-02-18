@@ -1,0 +1,59 @@
+# Copyright (c) 2026 Arista Networks, Inc.
+# Use of this source code is governed by the Apache License 2.0
+# that can be found in the LICENSE file.
+---
+- name: Verify Requirements
+  delegate_to: localhost
+  when: avd_requirements is not defined and avd_verify_requirements | default(true)
+  arista.avd.verify_requirements:
+    requirements: "{{ lookup('file', requirements_path ~ '/requirements.txt').splitlines() }}"
+    avd_ignore_requirements: "{{ avd_ignore_requirements | default(false) }}"
+  vars:
+    requirements_path: "{{ (role_path | split('/'))[0:-2] | join('/') }}"
+  run_once: true
+  register: avd_requirements
+
+- name: Deploy AVD structured configs to Nautobot
+  run_once: true
+  delegate_to: localhost
+  arista.avd.nautobot_deploy:
+    nautobot_url: "{{ nautobot_url }}"
+    nautobot_token: "{{ nautobot_token }}"
+    location_name: "{{ nautobot_location_name | arista.avd.default(omit) }}"
+    location_mapping: "{{ nautobot_location_mapping | arista.avd.default(omit) }}"
+    structured_config_dir: "{{ structured_dir | arista.avd.default(omit) }}"
+    structured_config_suffix: "{{ avd_structured_config_file_format }}"
+    device_list: "{{ nautobot_devices | arista.avd.default(omit) }}"
+    node_type_mapping: "{{ nautobot_node_type_mapping | arista.avd.default(omit) }}"
+    verify_ssl: "{{ nautobot_verify_ssl }}"
+    timeout: "{{ nautobot_timeout }}"
+    create_prerequisites: "{{ nautobot_create_prerequisites }}"
+    dry_run: "{{ nautobot_dry_run }}"
+    return_details: "{{ nautobot_return_details }}"
+    fail_on_errors: "{{ nautobot_fail_on_errors }}"
+    reconcile: "{{ nautobot_reconcile }}"
+    managed_tag: "{{ nautobot_managed_tag }}"
+    max_concurrent: "{{ nautobot_max_concurrent }}"
+    purge: "{{ nautobot_purge }}"
+    purge_prerequisites: "{{ nautobot_purge_prerequisites }}"
+  register: nautobot_deploy_results
+
+- name: Display Nautobot sync results
+  run_once: true
+  delegate_to: localhost
+  when: nautobot_display_results | default(true)
+  ansible.builtin.debug:
+    msg: |
+      Nautobot Sync Results:
+        Created: {{ nautobot_deploy_results.created | default(0) }}
+        Updated: {{ nautobot_deploy_results.updated | default(0) }}
+        Skipped: {{ nautobot_deploy_results.skipped | default(0) }}
+        Deleted: {{ nautobot_deploy_results.deleted | default(0) }}
+        Errors:  {{ nautobot_deploy_results.errors | default([]) | length }}
+      {% if nautobot_deploy_results.errors | default([]) %}
+
+      Errors:
+      {% for error in nautobot_deploy_results.errors[:10] %}
+        - {{ error }}
+      {% endfor %}
+      {% endif %}

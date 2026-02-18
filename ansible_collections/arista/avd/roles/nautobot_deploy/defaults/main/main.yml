@@ -1,0 +1,76 @@
+# Roles Defaults - main
+
+avd_structured_config_file_format: "yml"
+
+# Directory containing AVD structured configs (YAML files).
+# Defaults to the standard AVD output location relative to inventory.
+structured_dir: "{{ inventory_dir }}/intended/structured_configs"
+
+# Nautobot server configuration
+# nautobot_url: <str>  # Required - URL of the Nautobot instance
+# nautobot_token: <str>  # Required - Nautobot API token (use Ansible Vault)
+# nautobot_location_name: <str>  # Required - Location name in Nautobot
+
+# Verify SSL certificates when connecting to Nautobot.
+# Set to false for self-signed certificates in test environments.
+nautobot_verify_ssl: true
+
+# HTTP timeout in seconds for Nautobot API calls.
+nautobot_timeout: 30.0
+
+# Automatically create prerequisite objects in Nautobot (location, device types,
+# device roles, manufacturers, platforms, statuses) if they don't exist.
+nautobot_create_prerequisites: true
+
+# If true, no changes will be made to Nautobot. The role will report what
+# would be created or updated.
+nautobot_dry_run: false
+
+# Sync these devices to Nautobot.
+# Defaults to all devices found in the structured_config directory.
+# nautobot_devices:
+#   - device1
+#   - device2
+
+# Optional explicit mapping of device hostname to node type.
+# If not provided, node types are inferred from hostname patterns.
+# Valid node types: spine, l3leaf, l2leaf, l2spine, l3spine, p, pe, rr, wan_rr, wan_router
+# nautobot_node_type_mapping:
+#   dc1-spine1: spine
+#   dc1-leaf1a: l3leaf
+#   dc1-leaf1c: l2leaf
+
+# If true, detailed results will be registered into 'nautobot_deploy_results' variable.
+# Otherwise only basic results like created, updated, skipped, errors are registered.
+nautobot_return_details: false
+
+# If true, fail the playbook when there are sync errors.
+# If false (default), errors are logged but the playbook continues.
+nautobot_fail_on_errors: false
+
+# If true, display a summary of sync results at the end.
+nautobot_display_results: true
+
+# If true, delete objects from Nautobot that are tagged with managed_tag but
+# no longer exist in the AVD structured configs. This is useful for cleaning
+# up orphaned objects when devices/interfaces are removed from AVD.
+nautobot_reconcile: false
+
+# Tag name to mark AVD-managed objects in Nautobot. Objects with this tag that
+# aren't touched during sync will be deleted if nautobot_reconcile is true.
+nautobot_managed_tag: "avd-managed"
+
+# Maximum concurrent API requests.
+# Higher values may improve performance but could overwhelm the Nautobot server.
+nautobot_max_concurrent: 10
+
+# If true, delete ALL objects with managed_tag from Nautobot without syncing.
+# This is a destructive operation that removes all AVD-managed objects.
+# Useful for cleaning up a Nautobot instance before migration or starting fresh.
+# When purge is true, structured_config_dir and location_name/location_mapping are not required.
+nautobot_purge: false
+
+# If true (and nautobot_purge is also true), also delete prerequisite objects:
+# locations, device types, platforms, manufacturers, and roles.
+# Useful for completely removing all AVD traces from Nautobot.
+nautobot_purge_prerequisites: false

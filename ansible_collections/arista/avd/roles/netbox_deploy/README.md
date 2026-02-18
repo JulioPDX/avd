@@ -81,6 +81,7 @@ This basic example will deploy configurations for all devices in the structured 
 | `netbox_managed_tag` | `avd-managed` | Tag name for AVD-managed objects |
 | `netbox_max_concurrent` | `10` | Maximum concurrent API requests |
 | `netbox_purge` | `false` | Delete ALL objects with managed tag (destructive) |
+| `netbox_purge_prerequisites` | `false` | Also delete prerequisite objects (sites, device types, etc.) when purging |
 | `netbox_devicetype_library_url` | - | URL for NetBox Community Device Type Library (disabled by default) |
 | `netbox_platform_mapping` | - | Dict mapping AVD platform names to library device type model names |
 
@@ -304,6 +305,31 @@ When purge mode is enabled:
 - `structured_config_dir` and `site_name`/`site_mapping` are not required
 - Objects are deleted in reverse dependency order (cables → IPs → interfaces → etc.)
 - Only objects with the managed tag are affected; manually-created objects are preserved
+
+### Purge with Prerequisites
+
+By default, purge mode only deletes main objects (cables, IPs, interfaces, prefixes, VLANs, VRFs, ASNs, devices).
+To also delete prerequisite objects (sites, device types, platforms, manufacturers, device roles),
+use `netbox_purge_prerequisites: true`:
+
+```yaml
+- name: Purge everything including prerequisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "https://netbox.example.com"
+    netbox_token: "{{ vault_netbox_token }}"
+    netbox_purge: true
+    netbox_purge_prerequisites: true  # Also delete sites, device types, etc.
+  tasks:
+    - name: Purge NetBox completely
+      ansible.builtin.import_role:
+        name: arista.avd.netbox_deploy
+```
+
+> **Warning**: This removes all traces of AVD from NetBox, including sites and device types
+> that may be shared with other systems.
 
 ## Device Type Library Integration
 

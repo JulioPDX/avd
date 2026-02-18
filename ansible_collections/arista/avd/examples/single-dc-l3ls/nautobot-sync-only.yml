@@ -1,0 +1,11 @@
+---
+- name: Sync to Nautobot
+  hosts: localhost
+  gather_facts: false
+  vars:
+    nautobot_url: "{{ lookup('env', 'NAUTOBOT_URL') | default('http://127.0.0.1:8080', true) }}"
+    nautobot_token: "{{ lookup('env', 'NAUTOBOT_TOKEN') | default('330652db1b86fdb3269f3f2a7ee802f61172c1c8', true) }}"
+  tasks:
+    - name: Sync to Nautobot
+      ansible.builtin.import_role:
+        name: arista.avd.nautobot_deploy

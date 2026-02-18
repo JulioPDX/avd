@@ -86,8 +86,9 @@ class AsyncHelpersMixin:
     async def _create_devicetype_from_library(self, library_def: dict[str, Any], manufacturer_id: int) -> dict[str, Any] | None:
         """Create a device type in NetBox using a definition from the library."""
         endpoints = self.mapping.get_netbox_endpoints()
+        tag_id = await self._ensure_managed_tag()
 
-        device_type_data = {
+        device_type_data: dict[str, Any] = {
             "manufacturer": manufacturer_id,
             "model": library_def.get("model"),
             "slug": library_def.get("slug", slugify(library_def.get("model", ""))),
@@ -101,6 +102,10 @@ class AsyncHelpersMixin:
             device_type_data["weight"] = library_def["weight"]
             if "weight_unit" in library_def:
                 device_type_data["weight_unit"] = library_def["weight_unit"]
+
+        # Apply managed tag
+        if tag_id:
+            device_type_data["tags"] = [tag_id]
 
         try:
             device_type = await self.client.post(endpoints["device_types"], device_type_data)
@@ -134,11 +139,15 @@ class AsyncHelpersMixin:
             return
 
         endpoints = self.mapping.get_netbox_endpoints()
+        tag_id = await self._ensure_managed_tag()
 
         # Create manufacturer if needed
         existing = await self._find_netbox_object(endpoints["manufacturers"], slug=DEFAULT_MANUFACTURER["slug"])
         if not existing and not self.dry_run:
-            await self.client.post(endpoints["manufacturers"], DEFAULT_MANUFACTURER)
+            mfr_data: dict[str, Any] = {**DEFAULT_MANUFACTURER}
+            if tag_id:
+                mfr_data["tags"] = [tag_id]
+            await self.client.post(endpoints["manufacturers"], mfr_data)
             LOGGER.info("Created manufacturer: %s", DEFAULT_MANUFACTURER["name"])
 
         # Create device type if needed
@@ -146,7 +155,9 @@ class AsyncHelpersMixin:
         if not existing and not self.dry_run:
             mfr = await self._find_netbox_object(endpoints["manufacturers"], slug=DEFAULT_MANUFACTURER["slug"])
             if mfr:
-                device_type_data = {**DEFAULT_DEVICE_TYPE, "manufacturer": mfr["id"]}
+                device_type_data: dict[str, Any] = {**DEFAULT_DEVICE_TYPE, "manufacturer": mfr["id"]}
+                if tag_id:
+                    device_type_data["tags"] = [tag_id]
                 await self.client.post(endpoints["device_types"], device_type_data)
                 LOGGER.info("Created device type: %s", DEFAULT_DEVICE_TYPE["model"])
 
@@ -155,7 +166,10 @@ class AsyncHelpersMixin:
             role_slug = slugify(role_name)
             existing = await self._find_netbox_object(endpoints["device_roles"], slug=role_slug)
             if not existing and not self.dry_run:
-                await self.client.post(endpoints["device_roles"], {"name": role_name, "slug": role_slug})
+                role_data: dict[str, Any] = {"name": role_name, "slug": role_slug}
+                if tag_id:
+                    role_data["tags"] = [tag_id]
+                await self.client.post(endpoints["device_roles"], role_data)
                 LOGGER.info("Created device role: %s", role_name)
 
         self._prerequisites_created = True
@@ -245,7 +259,11 @@ class AsyncHelpersMixin:
             return existing
 
         if self.create_prerequisites and not self.dry_run:
-            site_data = {"name": site_name, "slug": slugify(site_name)}
+            # Get managed tag ID to include in creation
+            tag_id = await self._ensure_managed_tag()
+            site_data: dict[str, Any] = {"name": site_name, "slug": slugify(site_name)}
+            if tag_id:
+                site_data["tags"] = [tag_id]
             new_site = await self.client.post(endpoints["sites"], site_data)
             self._site_cache[site_name] = new_site
             LOGGER.info("Created site: %s", site_name)

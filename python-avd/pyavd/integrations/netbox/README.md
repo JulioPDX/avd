@@ -239,6 +239,8 @@ asyncio.run(sync_with_reconcile())
 The `purge_all()` method deletes **ALL** objects tagged with the managed tag from NetBox
 without performing any sync. This is useful for cleaning up before migration or starting fresh.
 
+### Basic Purge
+
 ```python
 import asyncio
 from pyavd.integrations.netbox import AsyncNetBoxClient, AsyncAVDNetBoxSync
@@ -257,6 +259,24 @@ async def purge_netbox():
 
 asyncio.run(purge_netbox())
 ```
+
+### Purge with Prerequisites
+
+By default, `purge_all()` only deletes main objects (cables, IPs, interfaces, prefixes, VLANs, VRFs, ASNs, devices). To also delete prerequisite objects (sites, device types, platforms, manufacturers, device roles), use the `purge_prerequisites` parameter:
+
+```python
+async def purge_everything():
+    async with AsyncNetBoxClient("https://netbox.example.com", "nbt_xxx.yyy") as client:
+        sync = AsyncAVDNetBoxSync(client, managed_tag="avd-managed")
+
+        # Delete everything including prerequisites (sites, device types, etc.)
+        result = await sync.purge_all(purge_prerequisites=True)
+        print(f"Deleted: {result.deleted} objects")
+
+asyncio.run(purge_everything())
+```
+
+This is useful for completely cleaning up a NetBox instance and starting fresh.
 
 ## Device Type Library Integration
 

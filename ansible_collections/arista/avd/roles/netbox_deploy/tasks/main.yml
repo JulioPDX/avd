@@ -33,9 +33,9 @@
     fail_on_errors: "{{ netbox_fail_on_errors }}"
     reconcile: "{{ netbox_reconcile }}"
     managed_tag: "{{ netbox_managed_tag }}"
-    use_async: "{{ netbox_use_async }}"
     max_concurrent: "{{ netbox_max_concurrent }}"
     purge: "{{ netbox_purge }}"
+    purge_prerequisites: "{{ netbox_purge_prerequisites }}"
     devicetype_library_url: "{{ netbox_devicetype_library_url | arista.avd.default(omit) }}"
     platform_mapping: "{{ netbox_platform_mapping | arista.avd.default(omit) }}"
   register: netbox_deploy_results

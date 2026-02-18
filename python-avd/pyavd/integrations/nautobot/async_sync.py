@@ -2,10 +2,10 @@
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
 """
-Async AVD to NetBox Synchronization Logic.
+Async AVD to Nautobot Synchronization Logic.
 
 Provides high-performance async synchronization from AVD structured configuration
-data to NetBox using concurrent requests.
+data to Nautobot using concurrent requests.
 """
 
 from __future__ import annotations
@@ -19,75 +19,68 @@ from typing import TYPE_CHECKING, Any
 from .async_device import AsyncDeviceMixin
 from .async_helpers import AsyncHelpersMixin
 from .async_interface import AsyncInterfaceMixin
-from .models import AVDNetBoxMapping, SyncResult
+from .models import AVDNautobotMapping, SyncResult
 
 if TYPE_CHECKING:
-    from .client import AsyncNetBoxClient
+    from .client import AsyncNautobotClient
 
 LOGGER = logging.getLogger(__name__)
 
 
-class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixin):
+class AsyncAVDNautobotSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixin):
     """
-    Async synchronization of AVD structured configuration to NetBox.
+    Async synchronization of AVD structured configuration to Nautobot.
 
     Uses concurrent requests to significantly speed up synchronization.
-    Typical speedup is 4-8x compared to synchronous version.
 
     Args:
-        client: Async NetBox API client instance
+        client: Async Nautobot API client instance
         mapping: Field mapping configuration (uses defaults if not provided)
-        dry_run: If True, don't make actual changes to NetBox
-        site_name: Default NetBox site name for new objects
-        site_mapping: Dict mapping hostname prefix to site name
-        create_prerequisites: If True, create missing sites/roles/types in NetBox
+        dry_run: If True, don't make actual changes to Nautobot
+        location_name: Default Nautobot location name for new objects
+        location_mapping: Dict mapping hostname prefix to location name
+        create_prerequisites: If True, create missing locations/roles/types in Nautobot
         managed_tag: Tag name to mark AVD-managed objects (default: "avd-managed")
         reconcile: If True, delete objects with managed_tag that weren't synced
         max_concurrent: Maximum concurrent operations per phase (default: 10)
-        devicetype_library_url: Base URL for NetBox Community Device Type Library (set to None to disable)
-        platform_mapping: Dict mapping AVD platform names to library device type model names
     """
 
     DEFAULT_MANAGED_TAG = "avd-managed"
 
     def __init__(
         self,
-        client: AsyncNetBoxClient,
-        mapping: AVDNetBoxMapping | None = None,
+        client: AsyncNautobotClient,
+        mapping: AVDNautobotMapping | None = None,
         *,
         dry_run: bool = False,
-        site_name: str | None = None,
-        site_mapping: dict[str, str] | None = None,
+        location_name: str | None = None,
+        location_mapping: dict[str, str] | None = None,
         create_prerequisites: bool = True,
         managed_tag: str | None = None,
         reconcile: bool = False,
         max_concurrent: int = 10,
-        devicetype_library_url: str | None = None,
-        platform_mapping: dict[str, str] | None = None,
     ) -> None:
         self.client = client
-        self.mapping = mapping or AVDNetBoxMapping()
+        self.mapping = mapping or AVDNautobotMapping()
         self.dry_run = dry_run
-        self.site_name = site_name
-        self.site_mapping = site_mapping or {}
+        self.location_name = location_name
+        self.location_mapping = location_mapping or {}
         self.create_prerequisites = create_prerequisites
         self.managed_tag = managed_tag or self.DEFAULT_MANAGED_TAG
         self.reconcile = reconcile
         self.max_concurrent = max_concurrent
-        self.devicetype_library_url = devicetype_library_url
-        self.platform_mapping = platform_mapping or {}
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._cache: dict[str, dict[str, Any]] = {}
         self._prerequisites_created = False
-        self._site_cache: dict[str, dict[str, Any]] = {}
-        self._managed_tag_id: int | None = None
+        self._location_cache: dict[str, dict[str, Any]] = {}
+        self._status_cache: dict[str, dict[str, Any]] = {}
+        self._namespace_id: str | None = None
+        self._managed_tag_id: str | None = None
         self._cache_lock = asyncio.Lock()
         self._prerequisite_lock = asyncio.Lock()
-        self._devicetype_library_cache: dict[str, dict[str, Any] | None] = {}
-        self._library_lock = asyncio.Lock()
 
-        # Track objects touched during sync for reconciliation
-        self._touched_objects: dict[str, set[int]] = {
+        # Track objects touched during sync for reconciliation (UUIDs as strings)
+        self._touched_objects: dict[str, set[str]] = {
             "devices": set(),
             "interfaces": set(),
             "vlans": set(),
@@ -95,21 +88,14 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             "ip_addresses": set(),
             "prefixes": set(),
             "cables": set(),
-            "asns": set(),
         }
-
-    # =========================================================================
-    # VLAN, VRF, Prefix, ASN, and Cable sync methods
-    # =========================================================================
-    # VLAN, VRF, Prefix, ASN, Cable sync methods (these stay in main class)
-    # =========================================================================
 
     async def sync_vlans(
         self,
         avd_structured_config: dict[str, Any],
         endpoints: dict[str, str],
     ) -> SyncResult:
-        """Sync VLANs from AVD config to NetBox."""
+        """Sync VLANs from AVD config to Nautobot."""
         result = SyncResult()
         hostname = avd_structured_config.get("hostname", "")
         vlans = avd_structured_config.get("vlans", [])
@@ -117,8 +103,11 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
         if not vlans:
             return result
 
-        site = await self._get_site_for_hostname(hostname)
-        site_id = site["id"] if site else None
+        location = await self._get_location_for_hostname(hostname)
+        location_id = location["id"] if location else None
+
+        # Get status for Active VLAN
+        status_id = await self._get_status_id("Active", "ipam.vlan")
 
         for vlan in vlans:
             vlan_id = vlan.get("id")
@@ -126,15 +115,17 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             if not vlan_id:
                 continue
 
-            vlan_data: dict[str, Any] = {"vid": vlan_id, "name": vlan_name, "status": "active"}
-            if site_id:
-                vlan_data["site"] = site_id
+            vlan_data: dict[str, Any] = {"vid": vlan_id, "name": vlan_name}
+            if status_id:
+                vlan_data["status"] = status_id
+            if location_id:
+                vlan_data["location"] = location_id
 
-            # Check for existing VLAN at this site
+            # Check for existing VLAN at this location
             params: dict[str, Any] = {"vid": vlan_id}
-            if site_id:
-                params["site_id"] = site_id
-            existing = await self._find_netbox_object(endpoints["vlans"], **params)
+            if location_id:
+                params["location"] = location_id
+            existing = await self._find_nautobot_object(endpoints["vlans"], **params)
 
             if self.dry_run:
                 result.skipped += 1
@@ -164,9 +155,15 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
         avd_structured_config: dict[str, Any],
         endpoints: dict[str, str],
     ) -> SyncResult:
-        """Sync VRFs from AVD config to NetBox."""
+        """Sync VRFs from AVD config to Nautobot."""
         result = SyncResult()
         vrfs = avd_structured_config.get("vrfs", [])
+
+        # Get namespace
+        namespace_id = await self._ensure_namespace()
+
+        # Get status for Active VRF
+        status_id = await self._get_status_id("Active", "ipam.vrf")
 
         for vrf in vrfs:
             vrf_name = vrf.get("name")
@@ -174,10 +171,14 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
                 continue
 
             vrf_data: dict[str, Any] = {"name": vrf_name}
+            if namespace_id:
+                vrf_data["namespace"] = namespace_id
+            if status_id:
+                vrf_data["status"] = status_id
             if "rd" in vrf:
                 vrf_data["rd"] = vrf["rd"]
 
-            existing = await self._find_netbox_object(endpoints["vrfs"], name=vrf_name)
+            existing = await self._find_nautobot_object(endpoints["vrfs"], name=vrf_name)
 
             if self.dry_run:
                 result.skipped += 1
@@ -202,104 +203,137 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
 
         return result
 
+    def _get_parent_prefix(self, ip_address: str) -> str | None:
+        """
+        Get a suitable parent prefix for an IP address.
+
+        Nautobot requires a containing prefix to exist before creating IP addresses.
+        This method calculates an appropriate parent prefix size.
+
+        Args:
+            ip_address: IP address string (e.g., "10.255.0.1/32" or "10.255.0.1")
+
+        Returns:
+            Parent prefix string (e.g., "10.255.0.0/24") or None if invalid
+        """
+        with contextlib.suppress(ValueError):
+            ip_obj = ipaddress.ip_interface(ip_address)
+            if ip_obj.version == 4:
+                # For IPv4, use /24 as parent (common subnet size)
+                return str(ipaddress.ip_network(f"{ip_obj.ip}/24", strict=False))
+            # For IPv6, use /64 as parent (common subnet size)
+            return str(ipaddress.ip_network(f"{ip_obj.ip}/64", strict=False))
+        return None
+
+    def _collect_all_ips_from_config(self, avd_structured_config: dict[str, Any]) -> set[str]:
+        """Collect all IP addresses from all interface types in the config."""
+        all_ips: set[str] = set()
+
+        # Interface types that can have IP addresses
+        interface_types = [
+            "loopback_interfaces",
+            "vlan_interfaces",
+            "ethernet_interfaces",
+            "port_channel_interfaces",
+        ]
+
+        for intf_type in interface_types:
+            for intf in avd_structured_config.get(intf_type, []):
+                # Regular IP address
+                if ip_addr := intf.get("ip_address"):
+                    all_ips.add(ip_addr)
+                # Virtual IP addresses (can be string or list)
+                ip_virtual = intf.get("ip_address_virtual")
+                if isinstance(ip_virtual, str):
+                    all_ips.add(ip_virtual)
+                elif isinstance(ip_virtual, list):
+                    all_ips.update(ip for ip in ip_virtual if isinstance(ip, str))
+
+        return all_ips
+
     async def sync_prefixes(
         self,
         avd_structured_config: dict[str, Any],
         endpoints: dict[str, str],
     ) -> SyncResult:
-        """Sync prefixes from AVD config to NetBox."""
+        """
+        Sync prefixes from AVD config to Nautobot.
+
+        Creates both parent prefixes (e.g., /24) and host prefixes (/32) to ensure
+        Nautobot can accept IP address creation within these prefixes.
+        """
         result = SyncResult()
 
-        # Extract prefixes from various sources in the config
-        prefixes_to_sync: set[str] = set()
+        # Collect all IP addresses from the config
+        all_ips = self._collect_all_ips_from_config(avd_structured_config)
 
-        # From loopback interfaces
-        for intf in avd_structured_config.get("loopback_interfaces", []):
-            if ip_addr := intf.get("ip_address"):
-                with contextlib.suppress(ValueError):
-                    network = ipaddress.ip_interface(ip_addr).network
-                    prefixes_to_sync.add(str(network))
+        # Calculate parent prefixes for all IPs (Nautobot requires parent prefix for IP creation)
+        parent_prefixes: set[str] = set()
+        host_prefixes: set[str] = set()
 
-        # From VLAN interfaces
-        for intf in avd_structured_config.get("vlan_interfaces", []):
-            if ip_addr := intf.get("ip_address"):
-                with contextlib.suppress(ValueError):
-                    network = ipaddress.ip_interface(ip_addr).network
-                    prefixes_to_sync.add(str(network))
+        for ip_addr in all_ips:
+            with contextlib.suppress(ValueError):
+                # Add host prefix (/32 or /128)
+                network = ipaddress.ip_interface(ip_addr).network
+                host_prefixes.add(str(network))
 
-        for prefix in prefixes_to_sync:
-            prefix_data: dict[str, Any] = {"prefix": prefix, "status": "active"}
-            existing = await self._find_netbox_object(endpoints["prefixes"], prefix=prefix)
+                # Add parent prefix (/24 or /64)
+                parent = self._get_parent_prefix(ip_addr)
+                if parent:
+                    parent_prefixes.add(parent)
 
-            if self.dry_run:
-                result.skipped += 1
-                continue
+        # Get namespace and status
+        namespace_id = await self._ensure_namespace()
+        status_id = await self._get_status_id("Active", "ipam.prefix")
 
-            try:
-                if existing:
-                    await self.client.patch(f"{endpoints['prefixes']}{existing['id']}/", prefix_data)
-                    result.updated += 1
-                    obj_id = existing["id"]
-                else:
-                    new_prefix = await self.client.post(endpoints["prefixes"], prefix_data)
-                    result.created += 1
-                    obj_id = new_prefix["id"]
+        # Sync parent prefixes FIRST (they must exist before child prefixes/IPs)
+        for prefix in sorted(parent_prefixes):
+            result = result + await self._sync_single_prefix(prefix, namespace_id, status_id, endpoints)
 
-                self._track_object("prefixes", obj_id)
-                await self._apply_managed_tag(endpoints["prefixes"], obj_id)
-            except Exception as e:
-                error_msg = f"Failed to sync prefix {prefix}: {e}"
-                result.errors.append(error_msg)
-                LOGGER.warning(error_msg)
+        # Then sync host prefixes
+        for prefix in sorted(host_prefixes):
+            result = result + await self._sync_single_prefix(prefix, namespace_id, status_id, endpoints)
 
         return result
 
-    async def sync_asns(
+    async def _sync_single_prefix(
         self,
-        avd_structured_config: dict[str, Any],
+        prefix: str,
+        namespace_id: str | None,
+        status_id: str | None,
         endpoints: dict[str, str],
     ) -> SyncResult:
-        """Sync ASNs from AVD config to NetBox."""
+        """Sync a single prefix to Nautobot."""
         result = SyncResult()
-        asns_to_sync: set[int] = set()
 
-        # Extract ASNs from BGP config
-        if bgp_as := avd_structured_config.get("router_bgp", {}).get("as"):
-            with contextlib.suppress(ValueError, TypeError):
-                asns_to_sync.add(int(bgp_as))
+        prefix_data: dict[str, Any] = {"prefix": prefix}
+        if namespace_id:
+            prefix_data["namespace"] = namespace_id
+        if status_id:
+            prefix_data["status"] = status_id
 
-        for asn in asns_to_sync:
-            asn_data: dict[str, Any] = {"asn": asn}
+        existing = await self._find_nautobot_object(endpoints["prefixes"], prefix=prefix)
 
-            # Get RIR for ASN assignment
-            rir_cache = await self._get_or_cache("rirs", endpoints["rirs"], "slug")
-            if "rfc-6996-private" in rir_cache:
-                asn_data["rir"] = rir_cache["rfc-6996-private"]["id"]
-            elif rir_cache:
-                asn_data["rir"] = next(iter(rir_cache.values()))["id"]
+        if self.dry_run:
+            result.skipped += 1
+            return result
 
-            existing = await self._find_netbox_object(endpoints["asns"], asn=asn)
+        try:
+            if existing:
+                await self.client.patch(f"{endpoints['prefixes']}{existing['id']}/", prefix_data)
+                result.updated += 1
+                obj_id = existing["id"]
+            else:
+                new_prefix = await self.client.post(endpoints["prefixes"], prefix_data)
+                result.created += 1
+                obj_id = new_prefix["id"]
 
-            if self.dry_run:
-                result.skipped += 1
-                continue
-
-            try:
-                if existing:
-                    await self.client.patch(f"{endpoints['asns']}{existing['id']}/", asn_data)
-                    result.updated += 1
-                    obj_id = existing["id"]
-                else:
-                    new_asn = await self.client.post(endpoints["asns"], asn_data)
-                    result.created += 1
-                    obj_id = new_asn["id"]
-
-                self._track_object("asns", obj_id)
-                await self._apply_managed_tag(endpoints["asns"], obj_id)
-            except Exception as e:
-                error_msg = f"Failed to sync ASN {asn}: {e}"
-                result.errors.append(error_msg)
-                LOGGER.warning(error_msg)
+            self._track_object("prefixes", obj_id)
+            await self._apply_managed_tag(endpoints["prefixes"], obj_id)
+        except Exception as e:
+            error_msg = f"Failed to sync prefix {prefix}: {e}"
+            result.errors.append(error_msg)
+            LOGGER.warning(error_msg)
 
         return result
 
@@ -311,10 +345,13 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
         """Sync cables between devices based on link topology."""
         result = SyncResult()
 
+        # Get status for Connected cable
+        status_id = await self._get_status_id("Connected", "dcim.cable")
+
         # Build interface ID cache
-        interface_cache: dict[str, dict[str, int]] = {}  # hostname -> {intf_name: intf_id}
+        interface_cache: dict[str, dict[str, str]] = {}  # hostname -> {intf_name: intf_id}
         for hostname in avd_structured_configs:
-            device = await self._find_netbox_object(endpoints["devices"], name=hostname)
+            device = await self._find_nautobot_object(endpoints["devices"], name=hostname)
             if not device:
                 continue
             interface_cache[hostname] = {}
@@ -336,11 +373,11 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
                 if not local_intf_id or not peer_intf_id:
                     continue
 
-                # Check for existing cable
+                # Check for existing cable (Nautobot uses termination_a_id/termination_b_id)
                 existing_cable = None
                 async for cable in self.client.get_all(
                     endpoints["cables"],
-                    params={"termination_a_id": local_intf_id, "termination_a_type": "dcim.interface"},
+                    params={"termination_a_id": local_intf_id},
                 ):
                     existing_cable = cable
                     break
@@ -348,7 +385,7 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
                 if not existing_cable:
                     async for cable in self.client.get_all(
                         endpoints["cables"],
-                        params={"termination_b_id": local_intf_id, "termination_b_type": "dcim.interface"},
+                        params={"termination_b_id": local_intf_id},
                     ):
                         existing_cable = cable
                         break
@@ -357,11 +394,14 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
                     result.skipped += 1
                     continue
 
-                cable_data = {
-                    "a_terminations": [{"object_type": "dcim.interface", "object_id": local_intf_id}],
-                    "b_terminations": [{"object_type": "dcim.interface", "object_id": peer_intf_id}],
-                    "status": "connected",
+                cable_data: dict[str, Any] = {
+                    "termination_a_type": "dcim.interface",
+                    "termination_a_id": local_intf_id,
+                    "termination_b_type": "dcim.interface",
+                    "termination_b_id": peer_intf_id,
                 }
+                if status_id:
+                    cable_data["status"] = status_id
 
                 try:
                     if existing_cable:
@@ -380,9 +420,9 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
         return result
 
     async def reconcile_objects(self) -> SyncResult:
-        """Delete NetBox objects with managed tag that weren't touched during sync."""
+        """Delete Nautobot objects with managed tag that weren't touched during sync."""
         result = SyncResult()
-        endpoints = self.mapping.get_netbox_endpoints()
+        endpoints = self.mapping.get_nautobot_endpoints()
 
         # Deletion order (reverse of creation to handle dependencies)
         deletion_order = [
@@ -392,13 +432,12 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             ("interfaces", endpoints["interfaces"]),
             ("vlans", endpoints["vlans"]),
             ("vrfs", endpoints["vrfs"]),
-            ("asns", endpoints["asns"]),
             ("devices", endpoints["devices"]),
         ]
 
         for object_type, endpoint in deletion_order:
             touched_ids = self._touched_objects.get(object_type, set())
-            params = {"tag": self.managed_tag}
+            params = {"tags": self.managed_tag}
 
             async for obj in self.client.get_all(endpoint, params=params):
                 obj_id = obj.get("id")
@@ -420,20 +459,14 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
 
     async def purge_all(self, dry_run: bool | None = None, purge_prerequisites: bool = False) -> SyncResult:
         """
-        Delete ALL objects with the managed tag from NetBox.
+        Delete ALL objects with the managed tag from Nautobot.
 
         This is a destructive operation that removes all AVD-managed objects
-        without performing any sync. Useful for cleaning up a NetBox instance
-        before migrating to a different source of truth or starting fresh.
-
-        Objects are deleted in reverse dependency order to avoid foreign key errors:
-        cables → IPs → interfaces → prefixes → VLANs → VRFs → ASNs → devices
+        without performing any sync.
 
         Args:
             dry_run: If True, don't actually delete, just count what would be deleted.
-                    Overrides instance dry_run setting.
-            purge_prerequisites: If True, also delete sites, device types, platforms,
-                    manufacturers, and device roles that have the managed tag.
+            purge_prerequisites: If True, also delete locations, device types, platforms, manufacturers, roles.
 
         Returns:
             SyncResult with deletion counts in the 'deleted' field
@@ -446,12 +479,12 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             LOGGER.info("No managed tag '%s' found - nothing to purge", self.managed_tag)
             return result
 
-        endpoints = self.mapping.get_netbox_endpoints()
+        endpoints = self.mapping.get_nautobot_endpoints()
 
-        # Endpoints that support 'tag' filter parameter
-        tag_filterable = {"cables", "ip_addresses", "interfaces", "prefixes", "vlans", "vrfs", "asns", "devices", "device_types", "sites"}
-        # Endpoints that don't support 'tag' filter - need to check tags on each object
-        non_tag_filterable = {"platforms", "manufacturers", "device_roles"}
+        # Endpoints that support 'tags' filter
+        tag_filterable = {"cables", "ip_addresses", "interfaces", "prefixes", "vlans", "vrfs", "devices", "device_types", "locations"}
+        # Endpoints that don't support 'tags' filter - need to check tags on each object
+        non_tag_filterable = {"platforms", "manufacturers", "roles"}
 
         # Deletion order (reverse dependencies)
         deletion_order: list[tuple[str, str]] = [
@@ -461,42 +494,44 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             ("prefixes", endpoints["prefixes"]),
             ("vlans", endpoints["vlans"]),
             ("vrfs", endpoints["vrfs"]),
-            ("asns", endpoints["asns"]),
             ("devices", endpoints["devices"]),
         ]
 
-        # Add prerequisite objects if requested
+        # Add prerequisites if requested (delete after devices to avoid dependency errors)
         if purge_prerequisites:
             deletion_order.extend(
                 [
                     ("device_types", endpoints["device_types"]),
                     ("platforms", endpoints["platforms"]),
                     ("manufacturers", endpoints["manufacturers"]),
-                    ("device_roles", endpoints["device_roles"]),
-                    ("sites", endpoints["sites"]),
+                    ("roles", endpoints["roles"]),
+                    ("locations", endpoints["locations"]),
                 ]
             )
 
-        LOGGER.info("Purging all objects with tag '%s' from NetBox...", self.managed_tag)
+        LOGGER.info("Purging all objects with tag '%s' from Nautobot%s...", self.managed_tag, " (including prerequisites)" if purge_prerequisites else "")
 
         for object_type, endpoint in deletion_order:
             # Get objects to delete
+            to_delete: list[dict[str, Any]] = []
+
             if object_type in tag_filterable:
-                # Endpoint supports tag filter
-                params = {"tag": self.managed_tag}
-                to_delete = await self.client.get_all_list(endpoint, params=params)
+                # Use tags filter directly
+                to_delete = await self.client.get_all_list(endpoint, params={"tags": self.managed_tag})
             elif object_type in non_tag_filterable:
-                # Endpoint doesn't support tag filter - get all and filter manually
+                # Get all objects and filter by tags manually
                 all_objects = await self.client.get_all_list(endpoint)
-                to_delete = []
                 for obj in all_objects:
                     obj_tags = obj.get("tags", [])
-                    tag_names = [t.get("name") if isinstance(t, dict) else t for t in obj_tags]
+                    # Tags can be list of dicts with 'name' key or list of strings
+                    tag_names = []
+                    for t in obj_tags:
+                        if isinstance(t, dict):
+                            tag_names.append(t.get("name", ""))
+                        elif isinstance(t, str):
+                            tag_names.append(t)
                     if self.managed_tag in tag_names:
                         to_delete.append(obj)
-            else:
-                params = {"tag": self.managed_tag}
-                to_delete = await self.client.get_all_list(endpoint, params=params)
 
             if not to_delete:
                 continue
@@ -539,8 +574,8 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
         This is the main entry point for async sync. It:
         1. Creates prerequisites (manufacturer, device types, roles)
         2. Syncs VRFs and VLANs (sequential - they're prerequisites for interfaces)
-        3. Syncs devices and interfaces CONCURRENTLY (main performance improvement)
-        4. Syncs prefixes, ASNs, and cables
+        3. Syncs devices and interfaces CONCURRENTLY
+        4. Syncs prefixes and cables
         5. Reconciles orphaned objects if enabled
 
         Args:
@@ -555,7 +590,7 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
 
         # Ensure prerequisites exist
         await self._ensure_prerequisites()
-        endpoints = self.mapping.get_netbox_endpoints()
+        endpoints = self.mapping.get_nautobot_endpoints()
 
         # First pass: sync VRFs and VLANs (sequential - they're prerequisites)
         LOGGER.info("Syncing VRFs and VLANs...")
@@ -563,7 +598,13 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
             result = result + await self.sync_vrfs(config, endpoints)
             result = result + await self.sync_vlans(config, endpoints)
 
-        # Second pass: sync devices and interfaces CONCURRENTLY
+        # Second pass: sync prefixes BEFORE devices/interfaces
+        # Nautobot requires parent prefixes to exist before creating IP addresses
+        LOGGER.info("Syncing prefixes (required for IP addresses)...")
+        for config in avd_structured_configs.values():
+            result = result + await self.sync_prefixes(config, endpoints)
+
+        # Third pass: sync devices and interfaces CONCURRENTLY
         LOGGER.info("Syncing %d devices concurrently (max %d concurrent)...", len(avd_structured_configs), self.max_concurrent)
         tasks = [self._sync_single_device(hostname, config, node_types.get(hostname), endpoints) for hostname, config in avd_structured_configs.items()]
 
@@ -577,19 +618,13 @@ class AsyncAVDNetBoxSync(AsyncHelpersMixin, AsyncDeviceMixin, AsyncInterfaceMixi
                 result.errors.append(error_msg)
                 LOGGER.error(error_msg)
 
-        # Third pass: sync prefixes and ASNs
-        LOGGER.info("Syncing prefixes and ASNs...")
-        for config in avd_structured_configs.values():
-            result = result + await self.sync_prefixes(config, endpoints)
-            result = result + await self.sync_asns(config, endpoints)
-
         # Fourth pass: sync cables
         LOGGER.info("Syncing cables...")
         result = result + await self.sync_cables(avd_structured_configs, endpoints)
 
         # Reconcile objects if enabled
         if self.reconcile:
-            LOGGER.info("Reconciling NetBox objects (deleting orphaned objects)...")
+            LOGGER.info("Reconciling Nautobot objects (deleting orphaned objects)...")
             reconcile_result = await self.reconcile_objects()
             LOGGER.info(
                 "Reconciliation complete: %d deleted, %d skipped, %d errors",

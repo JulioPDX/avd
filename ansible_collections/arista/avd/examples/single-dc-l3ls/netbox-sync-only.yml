@@ -1,0 +1,14 @@
+---
+- name: Sync to NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    netbox_url: "{{ lookup('env', 'NETBOX_URL') | default('http://127.0.0.1:8000', true) }}"
+    netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+    netbox_return_details: true
+    structured_dir: "{{ playbook_dir }}/intended/structured_configs"
+  tasks:
+    - name: Sync to NetBox
+      ansible.builtin.import_role:
+        name: arista.avd.netbox_deploy

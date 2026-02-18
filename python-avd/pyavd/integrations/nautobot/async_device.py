@@ -1,20 +1,19 @@
 # Copyright (c) 2023-2026 Arista Networks, Inc.
 # Use of this source code is governed by the Apache License 2.0
 # that can be found in the LICENSE file.
-"""Async device sync methods for AVD to NetBox synchronization."""
+"""Async device sync methods for AVD to Nautobot synchronization."""
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .models import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, DEFAULT_PLATFORM, NODE_TYPE_TO_DEVICE_ROLE, AVDNetBoxMapping, SyncResult
-from .transforms import slugify
+from .models import DEFAULT_DEVICE_TYPE, DEFAULT_MANUFACTURER, DEFAULT_PLATFORM, NODE_TYPE_TO_DEVICE_ROLE, AVDNautobotMapping, SyncResult
 
 if TYPE_CHECKING:
     import asyncio
 
-    from .client import AsyncNetBoxClient
+    from .client import AsyncNautobotClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,28 +21,26 @@ LOGGER = logging.getLogger(__name__)
 class AsyncDeviceMixin:
     """Mixin class providing async device sync methods."""
 
-    client: AsyncNetBoxClient
-    mapping: AVDNetBoxMapping
+    client: AsyncNautobotClient
+    mapping: AVDNautobotMapping
     dry_run: bool
     create_prerequisites: bool
     _semaphore: asyncio.Semaphore
     _prerequisite_lock: asyncio.Lock
-    _touched_objects: dict[str, set[int]]
+    _touched_objects: dict[str, set[str]]
 
-    # These methods are provided by AsyncHelpersMixin
-    async def _get_or_cache(self, cache_key: str, endpoint: str, lookup_field: str) -> dict[str, Any]: ...
-    async def _find_netbox_object(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None: ...
-    async def _get_site_for_hostname(self, hostname: str) -> dict[str, Any] | None: ...
-    async def _apply_managed_tag(self, endpoint: str, obj_id: int) -> bool: ...
-    async def _ensure_managed_tag(self) -> int | None: ...
-    def _track_object(self, obj_type: str, obj_id: int) -> None: ...
-    def _get_library_model_name(self, platform_name: str) -> str: ...
-    async def _fetch_devicetype_from_library(self, model_name: str) -> dict[str, Any] | None: ...
-    async def _create_devicetype_from_library(self, library_def: dict[str, Any], manufacturer_id: int) -> dict[str, Any] | None: ...
-
-    # This method is provided by AsyncInterfaceMixin - declared here for type checking only
+    # Type annotations for methods provided by other mixins (AsyncHelpersMixin)
+    # Note: These are TYPE_CHECKING only stubs - do not implement as that would shadow real implementations
     if TYPE_CHECKING:
 
+        async def _get_or_cache(self, cache_key: str, endpoint: str, lookup_field: str) -> dict[str, Any]: ...
+        async def _find_nautobot_object(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None: ...
+        async def _get_location_for_hostname(self, hostname: str) -> dict[str, Any] | None: ...
+        async def _apply_managed_tag(self, endpoint: str, obj_id: str) -> bool: ...
+        async def _ensure_managed_tag(self) -> str | None: ...
+        async def _get_status_id(self, status_name: str, content_type: str) -> str | None: ...
+        def _track_object(self, obj_type: str, obj_id: str) -> None: ...
+        # This method is provided by AsyncInterfaceMixin
         async def _sync_interfaces_async(self, avd_structured_config: dict[str, Any], endpoints: dict[str, str]) -> SyncResult: ...
 
     async def _sync_single_device(
@@ -80,31 +77,34 @@ class AsyncDeviceMixin:
         node_type: str | None,
         endpoints: dict[str, str],
     ) -> SyncResult:
-        """Sync a single device to NetBox."""
+        """Sync a single device to Nautobot."""
         result = SyncResult()
         hostname = avd_structured_config.get("hostname")
         if not hostname:
             return result
 
-        # Get or create site for this device
-        site = await self._get_site_for_hostname(hostname)
-        site_id = site["id"] if site else None
+        # Get or create location for this device
+        location = await self._get_location_for_hostname(hostname)
+        location_id = location["id"] if location else None
 
         # Determine device role
         if not node_type:
             node_type = self._infer_node_type(hostname)
         role_name = NODE_TYPE_TO_DEVICE_ROLE.get(node_type, "Unknown")
-        role_slug = slugify(role_name)
+
+        # Get status ID for "Active"
+        status_id = await self._get_status_id("Active", "dcim.device")
 
         # Build device data
-        device_data: dict[str, Any] = {"name": hostname, "status": "active"}
+        device_data: dict[str, Any] = {"name": hostname}
+        if status_id:
+            device_data["status"] = status_id
+        if location_id:
+            device_data["location"] = location_id
 
-        if site_id:
-            device_data["site"] = site_id
-
-        # Get role ID
-        roles_cache = await self._get_or_cache("device_roles", endpoints["device_roles"], "slug")
-        role = roles_cache.get(role_slug)
+        # Get role ID from extras/roles
+        roles_cache = await self._get_or_cache("roles", endpoints["roles"], "name")
+        role = roles_cache.get(role_name)
         if role:
             device_data["role"] = role["id"]
 
@@ -113,11 +113,11 @@ class AsyncDeviceMixin:
         platform_name = metadata.get("platform")
 
         # Get or create device type
-        types_cache = await self._get_or_cache("device_types", endpoints["device_types"], "slug")
+        types_cache = await self._get_or_cache("device_types", endpoints["device_types"], "model")
         if platform_name:
             await self._handle_device_type(platform_name, device_data, types_cache, endpoints)
         else:
-            default_type = types_cache.get(DEFAULT_DEVICE_TYPE["slug"])
+            default_type = types_cache.get(DEFAULT_DEVICE_TYPE["model"])
             if default_type:
                 device_data["device_type"] = default_type["id"]
 
@@ -125,7 +125,7 @@ class AsyncDeviceMixin:
         await self._handle_platform(device_data, endpoints)
 
         # Check for existing device
-        existing = await self._find_netbox_object(endpoints["devices"], name=hostname)
+        existing = await self._find_nautobot_object(endpoints["devices"], name=hostname)
 
         if self.dry_run:
             result.skipped += 1
@@ -158,82 +158,60 @@ class AsyncDeviceMixin:
         endpoints: dict[str, str],
     ) -> None:
         """Handle device type creation/lookup."""
-        library_model_name = self._get_library_model_name(platform_name)  # pylint: disable=assignment-from-no-return
-        device_type_slug = slugify(library_model_name)
-        device_type = types_cache.get(device_type_slug)
+        device_type = types_cache.get(platform_name)
 
         if device_type:
             device_data["device_type"] = device_type["id"]
         elif self.create_prerequisites and not self.dry_run:
             async with self._prerequisite_lock:
                 # Check cache again after acquiring lock
-                device_type = types_cache.get(device_type_slug)
+                device_type = types_cache.get(platform_name)
                 if device_type:
                     device_data["device_type"] = device_type["id"]
                 else:
-                    manufacturers_cache = await self._get_or_cache("manufacturers", endpoints["manufacturers"], "slug")
-                    manufacturer = manufacturers_cache.get(DEFAULT_MANUFACTURER["slug"])
+                    manufacturers_cache = await self._get_or_cache("manufacturers", endpoints["manufacturers"], "name")
+                    manufacturer = manufacturers_cache.get(DEFAULT_MANUFACTURER["name"])
                     manufacturer_id = manufacturer["id"] if manufacturer else None
 
-                    library_def = await self._fetch_devicetype_from_library(library_model_name)
-                    if library_def and manufacturer_id:
-                        new_device_type = await self._create_devicetype_from_library(library_def, manufacturer_id)
-                        if new_device_type:
-                            device_data["device_type"] = new_device_type["id"]
-                            types_cache[device_type_slug] = new_device_type
-                        else:
-                            await self._create_simple_device_type(library_model_name, device_type_slug, manufacturer_id, device_data, types_cache, endpoints)
-                    else:
-                        await self._create_simple_device_type(library_model_name, device_type_slug, manufacturer_id, device_data, types_cache, endpoints)
+                    if manufacturer_id:
+                        LOGGER.info("Creating device type: %s", platform_name)
+                        # Include managed tag
+                        tag_id = await self._ensure_managed_tag()
+                        device_type_data: dict[str, Any] = {"model": platform_name, "manufacturer": manufacturer_id}
+                        if tag_id:
+                            device_type_data["tags"] = [tag_id]
+                        new_device_type = await self.client.post(endpoints["device_types"], device_type_data)
+                        device_data["device_type"] = new_device_type["id"]
+                        types_cache[platform_name] = new_device_type
         else:
             LOGGER.debug("Device type '%s' not found, using default", platform_name)
-            default_type = types_cache.get(DEFAULT_DEVICE_TYPE["slug"])
+            default_type = types_cache.get(DEFAULT_DEVICE_TYPE["model"])
             if default_type:
                 device_data["device_type"] = default_type["id"]
 
-    async def _create_simple_device_type(
-        self,
-        model_name: str,
-        slug: str,
-        manufacturer_id: int | None,
-        device_data: dict[str, Any],
-        types_cache: dict[str, Any],
-        endpoints: dict[str, str],
-    ) -> None:
-        """Create a simple device type without library specs."""
-        LOGGER.info("Creating device type: %s", model_name)
-        tag_id = await self._ensure_managed_tag()
-        device_type_data: dict[str, Any] = {"model": model_name, "slug": slug}
-        if manufacturer_id:
-            device_type_data["manufacturer"] = manufacturer_id
-        if tag_id:
-            device_type_data["tags"] = [tag_id]
-        new_device_type = await self.client.post(endpoints["device_types"], device_type_data)
-        device_data["device_type"] = new_device_type["id"]
-        types_cache[slug] = new_device_type
-
     async def _handle_platform(self, device_data: dict[str, Any], endpoints: dict[str, str]) -> None:
         """Handle EOS platform creation/lookup."""
-        platforms_cache = await self._get_or_cache("platforms", endpoints["platforms"], "slug")
-        eos_platform = platforms_cache.get(DEFAULT_PLATFORM["slug"])
+        platforms_cache = await self._get_or_cache("platforms", endpoints["platforms"], "name")
+        eos_platform = platforms_cache.get(DEFAULT_PLATFORM["name"])
 
         if eos_platform:
             device_data["platform"] = eos_platform["id"]
         elif self.create_prerequisites and not self.dry_run:
             async with self._prerequisite_lock:
-                eos_platform = platforms_cache.get(DEFAULT_PLATFORM["slug"])
+                eos_platform = platforms_cache.get(DEFAULT_PLATFORM["name"])
                 if eos_platform:
                     device_data["platform"] = eos_platform["id"]
                 else:
                     LOGGER.info("Creating platform: %s", DEFAULT_PLATFORM["name"])
-                    # Apply managed tag to platform
-                    tag_id = await self._ensure_managed_tag()
-                    platform_data: dict[str, Any] = {**DEFAULT_PLATFORM}
-                    if tag_id:
-                        platform_data["tags"] = [tag_id]
+                    # Note: Nautobot platforms don't support tags
+                    manufacturers_cache = await self._get_or_cache("manufacturers", endpoints["manufacturers"], "name")
+                    manufacturer = manufacturers_cache.get(DEFAULT_MANUFACTURER["name"])
+                    platform_data: dict[str, Any] = {"name": DEFAULT_PLATFORM["name"]}
+                    if manufacturer:
+                        platform_data["manufacturer"] = manufacturer["id"]
                     new_platform = await self.client.post(endpoints["platforms"], platform_data)
                     device_data["platform"] = new_platform["id"]
-                    platforms_cache[DEFAULT_PLATFORM["slug"]] = new_platform
+                    platforms_cache[DEFAULT_PLATFORM["name"]] = new_platform
 
     def _infer_node_type(self, hostname: str) -> str:
         """Infer AVD node type from hostname patterns."""
